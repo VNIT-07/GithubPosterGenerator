@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { 
   Github, 
   Code,
@@ -245,57 +246,21 @@ export default function App() {
     if (!el) return;
 
     try {
-      // Clone the element to avoid modifying the live DOM
-      const clone = el.cloneNode(true);
-      clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
-      document.body.appendChild(clone);
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false,
+      });
 
-      // Use html2canvas-like approach via Canvas API
-      const canvas = document.createElement('canvas');
-      const rect = el.getBoundingClientRect();
-      const scale = 2; // 2x for retina quality
-      canvas.width = rect.width * scale;
-      canvas.height = rect.height * scale;
-
-      const ctx = canvas.getContext('2d');
-      ctx.scale(scale, scale);
-
-      // Serialize the element to SVG foreignObject
-      const data = new XMLSerializer().serializeToString(el);
-      const svgStr = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">
-          <foreignObject width="100%" height="100%">
-            <div xmlns="http://www.w3.org/1999/xhtml">${data}</div>
-          </foreignObject>
-        </svg>`;
-
-      const img = new Image();
-      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        document.body.removeChild(clone);
-
-        const link = document.createElement('a');
-        link.download = `${userData?.login || 'github'}-poster.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      };
-
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        document.body.removeChild(clone);
-        // Fallback: use window.print()
-        window.print();
-      };
-
-      img.src = url;
+      const link = document.createElement('a');
+      link.download = `${userData?.login || 'github'}-poster.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
     } catch (err) {
       console.error('Download failed:', err);
-      window.print();
+      alert('Download failed. Please try right-clicking the poster and selecting "Save as image".');
     }
   };
 
