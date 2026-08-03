@@ -339,32 +339,35 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
       {/* Controls Container */}
-      <div className="max-w-4xl mx-auto mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="flex gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
+      <div className="max-w-4xl mx-auto mb-8 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200">
+        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+          {/* Search Form + Buttons */}
+          <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2">
+            <div className="relative flex-1">
               <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
                 value={inputUsername}
                 onChange={(e) => setInputUsername(e.target.value)}
                 placeholder="Username or GitHub URL"
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]"
+                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
               />
             </div>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="h-10 whitespace-nowrap">
               {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
               Generate
             </Button>
-            <Button variant="secondary" onClick={handleDownload} disabled={loading || !userData}>
+            <Button variant="secondary" onClick={handleDownload} disabled={loading || !userData} className="h-10 whitespace-nowrap">
               <Download className="w-4 h-4" />
               Download
             </Button>
           </form>
 
+          {/* Divider */}
+          <div className="hidden md:block w-px h-8 bg-gray-200"></div>
+
           {/* Theme Selector */}
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex items-center gap-2 shrink-0">
             <Layers className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">Theme:</span>
             <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -372,7 +375,7 @@ export default function App() {
                 <button
                   key={t}
                   onClick={() => setTheme(t)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md capitalize transition-all ${
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md capitalize transition-all ${
                     theme === t
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-500 hover:text-gray-900"
