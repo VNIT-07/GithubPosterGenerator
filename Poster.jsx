@@ -15,11 +15,11 @@ import {
   Share2
 } from 'lucide-react';
 
-const Card = ({ children, className = "" }) => (
-  <div className={`rounded-xl overflow-hidden ${className}`}>
+const Card = React.forwardRef(({ children, className = "" }, ref) => (
+  <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
   </div>
-);
+));
 
 const Button = ({ children, onClick, variant = "primary", className = "", disabled = false }) => {
   const baseStyle =
@@ -232,11 +232,80 @@ export default function App() {
     fetchGithubData();
   }, []);
 
+  const extractUsername = (input) => {
+    const trimmed = input.trim();
+    // Match GitHub profile URLs like https://github.com/username or github.com/username
+    const urlMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_-]+)\/?$/i);
+    if (urlMatch) return urlMatch[1];
+    return trimmed;
+  };
+
+  const handleDownload = async () => {
+    const el = posterRef.current;
+    if (!el) return;
+
+    try {
+      // Clone the element to avoid modifying the live DOM
+      const clone = el.cloneNode(true);
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      document.body.appendChild(clone);
+
+      // Use html2canvas-like approach via Canvas API
+      const canvas = document.createElement('canvas');
+      const rect = el.getBoundingClientRect();
+      const scale = 2; // 2x for retina quality
+      canvas.width = rect.width * scale;
+      canvas.height = rect.height * scale;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      // Serialize the element to SVG foreignObject
+      const data = new XMLSerializer().serializeToString(el);
+      const svgStr = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">
+          <foreignObject width="100%" height="100%">
+            <div xmlns="http://www.w3.org/1999/xhtml">${data}</div>
+          </foreignObject>
+        </svg>`;
+
+      const img = new Image();
+      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        document.body.removeChild(clone);
+
+        const link = document.createElement('a');
+        link.download = `${userData?.login || 'github'}-poster.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        document.body.removeChild(clone);
+        // Fallback: use window.print()
+        window.print();
+      };
+
+      img.src = url;
+    } catch (err) {
+      console.error('Download failed:', err);
+      window.print();
+    }
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
-    if (inputUsername.trim()) {
-      setUsername(inputUsername);
-      fetchGithubData(inputUsername);
+    const user = extractUsername(inputUsername);
+    if (user) {
+      setInputUsername(user);
+      setUsername(user);
+      fetchGithubData(user);
     }
   };
 
@@ -280,13 +349,17 @@ export default function App() {
                 type="text"
                 value={inputUsername}
                 onChange={(e) => setInputUsername(e.target.value)}
-                placeholder="Enter GitHub Username"
+                placeholder="Username or GitHub URL"
                 className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]"
               />
             </div>
             <Button type="submit" disabled={loading}>
               {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
               Generate
+            </Button>
+            <Button variant="secondary" onClick={handleDownload} disabled={loading || !userData}>
+              <Download className="w-4 h-4" />
+              Download
             </Button>
           </form>
 
