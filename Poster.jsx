@@ -142,6 +142,7 @@ const RadarChart = ({ stats, color, theme }) => {
 
 export default function App() {
   const [username, setUsername] = useState("VNIT-07");
+  const [inputUsername, setInputUsername] = useState("VNIT-07");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -163,17 +164,21 @@ export default function App() {
     return colors[lang] || "#6e7681";
   };
 
-  const fetchGithubData = async () => {
+  const fetchGithubData = async (userToFetch = username) => {
     setLoading(true);
     setError(null);
 
+    const token = import.meta.env.VITE_GITHUB_TOKEN;
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
     try {
-      const userRes = await fetch(`https://api.github.com/users/${username}`);
+      const userRes = await fetch(`https://api.github.com/users/${userToFetch}`, { headers });
       if (!userRes.ok) throw new Error("User not found");
       const user = await userRes.json();
 
       const reposRes = await fetch(
-        `https://api.github.com/users/${username}/repos?sort=updated&per_page=100`
+        `https://api.github.com/users/${userToFetch}/repos?sort=updated&per_page=100`,
+        { headers }
       );
       const repos = await reposRes.json();
 
@@ -209,11 +214,11 @@ export default function App() {
         languages,
         top_repos,
         chartStats: [
-          { label: "Volume", value: 80 },
-          { label: "Impact", value: 65 },
-          { label: "Community", value: 75 },
-          { label: "Consistency", value: 90 },
-          { label: "Stack", value: 60 }
+          { label: "Volume", value: Math.min(100, Math.max(30, user.public_repos * 3)) },
+          { label: "Impact", value: Math.min(100, Math.max(20, user.followers * 5)) },
+          { label: "Community", value: Math.min(100, Math.max(40, user.following * 4)) },
+          { label: "Consistency", value: 85 },
+          { label: "Stack", value: Math.min(100, languages.length * 20) }
         ]
       });
     } catch (err) {
@@ -227,5 +232,221 @@ export default function App() {
     fetchGithubData();
   }, []);
 
-  return <div className="min-h-screen bg-[#f3f2ef] p-6">...</div>;
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (inputUsername.trim()) {
+      setUsername(inputUsername);
+      fetchGithubData(inputUsername);
+    }
+  };
+
+  // Theme Styles
+  const themeStyles = {
+    professional: {
+      bg: "bg-white text-gray-900 border border-gray-200 shadow-xl",
+      accent: "#0a66c2",
+      headerBg: "bg-gradient-to-r from-slate-900 to-slate-800 text-white",
+      badge: "bg-blue-50 text-[#0a66c2] border border-blue-100",
+      cardInner: "bg-slate-50 border border-slate-100"
+    },
+    cyberpunk: {
+      bg: "bg-slate-950 text-cyan-400 border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.15)]",
+      accent: "#06b6d4",
+      headerBg: "bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 border-b border-cyan-500/30 text-cyan-300",
+      badge: "bg-cyan-950 text-cyan-400 border border-cyan-800",
+      cardInner: "bg-slate-900/80 border border-cyan-500/20"
+    },
+    minimal: {
+      bg: "bg-stone-50 text-stone-800 border border-stone-200 shadow-lg",
+      accent: "#44403c",
+      headerBg: "bg-stone-200 text-stone-900",
+      badge: "bg-stone-200 text-stone-700",
+      cardInner: "bg-white border border-stone-200"
+    }
+  };
+
+  const currentTheme = themeStyles[theme];
+
+  return (
+    <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
+      {/* Controls Container */}
+      <div className="max-w-4xl mx-auto mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          {/* Search Form */}
+          <form onSubmit={handleSearch} className="flex gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                value={inputUsername}
+                onChange={(e) => setInputUsername(e.target.value)}
+                placeholder="Enter GitHub Username"
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]"
+              />
+            </div>
+            <Button type="submit" disabled={loading}>
+              {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
+              Generate
+            </Button>
+          </form>
+
+          {/* Theme Selector */}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <Layers className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Theme:</span>
+            <div className="flex bg-gray-100 p-1 rounded-lg">
+              {["professional", "cyberpunk", "minimal"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md capitalize transition-all ${
+                    theme === t
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto flex justify-center">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center p-16 gap-3">
+            <LoadingSpinner />
+            <p className="text-gray-500 text-sm">Fetching GitHub Profile...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 text-center max-w-md">
+            <p className="font-semibold">Failed to load profile</p>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        ) : userData ? (
+          <Card className={`w-full max-w-2xl ${currentTheme.bg} transition-all duration-300`} ref={posterRef}>
+            {/* Header Section */}
+            <div className={`p-6 ${currentTheme.headerBg}`}>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                <img
+                  src={userData.avatar_url}
+                  alt={userData.name || userData.login}
+                  className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md"
+                />
+                <div className="flex-1 text-center sm:text-left">
+                  <h1 className="text-2xl font-bold tracking-tight">
+                    {userData.name || userData.login}
+                  </h1>
+                  <p className="text-sm opacity-80 flex items-center justify-center sm:justify-start gap-1 mt-0.5">
+                    @{userData.login}
+                  </p>
+                  {userData.bio && (
+                    <p className="text-xs mt-2 opacity-90 line-clamp-2 max-w-lg">
+                      {userData.bio}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
+                    {userData.location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {userData.location}
+                      </span>
+                    )}
+                    {userData.company && (
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="w-3 h-3" /> {userData.company}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> Joined {new Date(userData.created_at).getFullYear()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Body Section */}
+            <div className="p-6 space-y-6">
+              {/* Stats Bar */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className={`p-3 rounded-lg text-center ${currentTheme.cardInner}`}>
+                  <span className="block text-xl font-bold">{userData.public_repos}</span>
+                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Repositories</span>
+                </div>
+                <div className={`p-3 rounded-lg text-center ${currentTheme.cardInner}`}>
+                  <span className="block text-xl font-bold">{userData.followers}</span>
+                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Followers</span>
+                </div>
+                <div className={`p-3 rounded-lg text-center ${currentTheme.cardInner}`}>
+                  <span className="block text-xl font-bold">{userData.following}</span>
+                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Following</span>
+                </div>
+              </div>
+
+              {/* Languages & Radar Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                {/* Top Languages */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                    <Code className="w-3.5 h-3.5" /> Top Languages
+                  </h3>
+                  <div className="space-y-2">
+                    {userData.languages.map((lang) => (
+                      <div key={lang.name} className="space-y-1">
+                        <div className="flex justify-between text-xs font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: lang.color }} />
+                            {lang.name}
+                          </span>
+                          <span className="opacity-75">{lang.percentage}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-200/40 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${lang.percentage}%`,
+                              backgroundColor: lang.color
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Radar Chart */}
+                <div className="flex flex-col items-center">
+                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 mb-2 flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5" /> Developer Skill Matrix
+                  </h3>
+                  <RadarChart stats={userData.chartStats} color={currentTheme.accent} theme={theme} />
+                </div>
+              </div>
+
+              {/* Top Repositories */}
+              {userData.top_repos && userData.top_repos.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5" /> Top Repositories
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {userData.top_repos.map((repo) => (
+                      <div key={repo.name} className={`p-3 rounded-lg ${currentTheme.cardInner} flex flex-col justify-between`}>
+                        <p className="text-xs font-semibold truncate">{repo.name}</p>
+                        <div className="flex items-center justify-between text-[11px] opacity-75 mt-2">
+                          <span>{repo.language || "Plain"}</span>
+                          <span>★ {repo.stars}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        ) : null}
+      </div>
+    </div>
+  );
 }
