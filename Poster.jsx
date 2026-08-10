@@ -13,8 +13,7 @@ import {
   TrendingUp,
   Award,
   Layers,
-  Share2,
-  Activity
+  Share2
 } from 'lucide-react';
 
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
@@ -142,240 +141,6 @@ const RadarChart = ({ stats, color, theme }) => {
   );
 };
 
-const ContributionGraph = ({ contributionsByYear, theme, joinedYear, onYearChange, selectedYear, loadingYear }) => {
-  const currentYear = new Date().getFullYear();
-  const years = [];
-  for (let y = currentYear; y >= joinedYear; y--) {
-    years.push(y);
-  }
-
-  const contributions = contributionsByYear[selectedYear] || {};
-
-  const themeColors = {
-    professional: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
-    cyberpunk: ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'],
-    minimal: ['#ebedf0', '#d6c8b8', '#b8a08a', '#9a785c', '#7c5030']
-  };
-
-  const colors = themeColors[theme] || themeColors.professional;
-
-  const getColor = (count) => {
-    if (count === 0) return colors[0];
-    if (count <= 2) return colors[1];
-    if (count <= 5) return colors[2];
-    if (count <= 8) return colors[3];
-    return colors[4];
-  };
-
-  // Build weeks grid: for current year use "last 12 months", for past years use Jan 1 - Dec 31
-  const weeks = [];
-  let startDate, endDate;
-
-  if (selectedYear === currentYear) {
-    const today = new Date();
-    const oneYearAgo = new Date(today);
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    oneYearAgo.setDate(oneYearAgo.getDate() - oneYearAgo.getDay());
-    startDate = new Date(oneYearAgo);
-    endDate = today;
-  } else {
-    startDate = new Date(selectedYear, 0, 1);
-    // Align to start of week (Sunday)
-    startDate.setDate(startDate.getDate() - startDate.getDay());
-    endDate = new Date(selectedYear, 11, 31);
-  }
-
-  const totalWeeks = Math.ceil((endDate - startDate) / (7 * 24 * 60 * 60 * 1000)) + 1;
-  const numWeeks = Math.min(totalWeeks, 53);
-
-  for (let w = 0; w < numWeeks; w++) {
-    const week = [];
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + w * 7 + d);
-      const key = date.toISOString().split('T')[0];
-      const dateYear = date.getFullYear();
-      // Only show cells that belong to the selected year (or current year range)
-      const inRange = selectedYear === currentYear
-        ? date <= endDate
-        : dateYear === selectedYear;
-      const count = inRange ? (contributions[key] || 0) : -1;
-      week.push({ date: key, count, inRange });
-    }
-    weeks.push(week);
-  }
-
-  const months = [];
-  let lastMonth = -1;
-  weeks.forEach((week, i) => {
-    const d = new Date(week[0].date);
-    const m = d.getMonth();
-    if (m !== lastMonth) {
-      months.push({ index: i, name: d.toLocaleString('en', { month: 'short' }) });
-      lastMonth = m;
-    }
-  });
-
-  const totalContributions = Object.values(contributions).reduce((a, b) => a + b, 0);
-
-  // Compute totals per year for hover tooltips
-  const yearTotals = {};
-  years.forEach((y) => {
-    const yearData = contributionsByYear[y];
-    if (yearData) {
-      yearTotals[y] = Object.values(yearData).reduce((a, b) => a + b, 0);
-    }
-  });
-
-  const textColor = theme === 'cyberpunk' ? '#8b949e' : theme === 'minimal' ? '#78716c' : '#57606a';
-  const totalColor = theme === 'cyberpunk' ? '#58a6ff' : theme === 'minimal' ? '#44403c' : '#0a66c2';
-
-  const yearListBg = theme === 'cyberpunk' ? 'rgba(22, 27, 34, 0.8)' : theme === 'minimal' ? '#f5f5f4' : '#f6f8fa';
-  const yearActiveBg = theme === 'cyberpunk' ? '#58a6ff' : theme === 'minimal' ? '#44403c' : '#0a66c2';
-  const yearActiveText = '#ffffff';
-  const yearHoverBg = theme === 'cyberpunk' ? 'rgba(88, 166, 255, 0.15)' : theme === 'minimal' ? '#e7e5e4' : '#eaeef2';
-  const yearBorder = theme === 'cyberpunk' ? 'rgba(48, 54, 61, 0.8)' : theme === 'minimal' ? '#d6d3d1' : '#d0d7de';
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
-          <Activity className="w-3.5 h-3.5" /> Contribution Activity
-        </h3>
-        <span className="text-xs font-semibold" style={{ color: totalColor }}>
-          {loadingYear ? '...' : totalContributions.toLocaleString()} contributions in {selectedYear === currentYear ? 'the last year' : selectedYear}
-        </span>
-      </div>
-
-      <div className="flex gap-3">
-        {/* Graph area */}
-        <div className="flex-1 overflow-hidden" style={{ position: 'relative', minHeight: '110px' }}>
-          {loadingYear ? (
-            <div className="flex items-center justify-center" style={{ height: '110px' }}>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: totalColor }} />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              {/* Month labels */}
-              <div className="flex" style={{ marginLeft: '28px' }}>
-                {months.map((m, i) => (
-                  <span
-                    key={i}
-                    className="text-[9px] font-medium"
-                    style={{
-                      position: 'relative',
-                      left: `${m.index * 13}px`,
-                      color: textColor,
-                      marginRight: i < months.length - 1
-                        ? `${(months[i + 1]?.index - m.index) * 13 - 24}px`
-                        : '0'
-                    }}
-                  >
-                    {m.name}
-                  </span>
-                ))}
-              </div>
-
-              {/* Grid */}
-              <div className="flex gap-0.5">
-                {/* Day labels */}
-                <div className="flex flex-col gap-0.5 mr-1" style={{ width: '24px' }}>
-                  {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((day, i) => (
-                    <span
-                      key={i}
-                      className="text-[9px] font-medium leading-none flex items-center justify-end"
-                      style={{ height: '11px', color: textColor }}
-                    >
-                      {day}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Weeks columns */}
-                {weeks.map((week, wi) => (
-                  <div key={wi} className="flex flex-col gap-0.5">
-                    {week.map((day, di) => (
-                      <div
-                        key={di}
-                        title={day.inRange ? `${day.count} contributions on ${day.date}` : ''}
-                        style={{
-                          width: '11px',
-                          height: '11px',
-                          backgroundColor: day.inRange ? getColor(day.count) : 'transparent',
-                          borderRadius: '2px',
-                          outline: day.inRange
-                            ? (theme === 'cyberpunk' ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(27,31,36,0.06)')
-                            : 'none'
-                        }}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-
-              {/* Legend */}
-              <div className="flex items-center justify-end gap-1 mt-1">
-                <span className="text-[9px]" style={{ color: textColor }}>Less</span>
-                {colors.map((c, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: '11px',
-                      height: '11px',
-                      backgroundColor: c,
-                      borderRadius: '2px',
-                      outline: theme === 'cyberpunk' ? '1px solid rgba(255,255,255,0.04)' : '1px solid rgba(27,31,36,0.06)'
-                    }}
-                  />
-                ))}
-                <span className="text-[9px]" style={{ color: textColor }}>More</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Year list */}
-        <div
-          className="flex flex-col gap-0.5 shrink-0"
-          style={{
-            borderLeft: `1px solid ${yearBorder}`,
-            paddingLeft: '8px',
-            minWidth: '48px'
-          }}
-        >
-          {years.map((y) => (
-            <button
-              key={y}
-              onClick={() => onYearChange(y)}
-              title={yearTotals[y] !== undefined ? `${yearTotals[y].toLocaleString()} contributions in ${y}` : `Load ${y}`}
-              className="transition-all duration-150 text-[11px] font-semibold rounded-md text-right"
-              style={{
-                padding: '3px 8px',
-                backgroundColor: selectedYear === y ? yearActiveBg : 'transparent',
-                color: selectedYear === y ? yearActiveText : textColor,
-                cursor: 'pointer',
-                border: 'none',
-                outline: 'none',
-              }}
-              onMouseEnter={(e) => {
-                if (selectedYear !== y) {
-                  e.currentTarget.style.backgroundColor = yearHoverBg;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (selectedYear !== y) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default function App() {
   const [username, setUsername] = useState("VNIT-07");
@@ -384,7 +149,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [userData, setUserData] = useState(null);
   const [theme, setTheme] = useState("professional");
-  const [loadingContribYear, setLoadingContribYear] = useState(false);
+
   const posterRef = useRef(null);
 
   const getLangColor = (lang) => {
@@ -402,110 +167,7 @@ export default function App() {
     return colors[lang] || "#6e7681";
   };
 
-  const fetchContributionsGraphQL = async (userToFetch, token, year = null) => {
-    // For GraphQL, we can specify a date range via `from` and `to`
-    const currentYear = new Date().getFullYear();
-    let fromDate, toDate;
 
-    if (year && year !== currentYear) {
-      fromDate = `${year}-01-01T00:00:00Z`;
-      toDate = `${year}-12-31T23:59:59Z`;
-    } else {
-      // Default: last 12 months
-      const now = new Date();
-      const oneYearAgo = new Date(now);
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      fromDate = oneYearAgo.toISOString();
-      toDate = now.toISOString();
-    }
-
-    const query = `
-      query($username: String!, $from: DateTime!, $to: DateTime!) {
-        user(login: $username) {
-          contributionsCollection(from: $from, to: $to) {
-            contributionCalendar {
-              totalContributions
-              weeks {
-                contributionDays {
-                  contributionCount
-                  date
-                }
-              }
-            }
-          }
-        }
-      }
-    `;
-
-    const res = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: { username: userToFetch, from: fromDate, to: toDate }
-      }),
-    });
-
-    if (!res.ok) throw new Error('GraphQL request failed');
-    const data = await res.json();
-
-    if (data.errors) throw new Error(data.errors[0].message);
-
-    const calendar = data.data.user.contributionsCollection.contributionCalendar;
-    const contributions = {};
-
-    calendar.weeks.forEach((week) => {
-      week.contributionDays.forEach((day) => {
-        contributions[day.date] = day.contributionCount;
-      });
-    });
-
-    return contributions;
-  };
-
-  const fetchContributionsPublicAPI = async (userToFetch, year = null) => {
-    // Public API that scrapes GitHub contribution data — no token needed
-    const yearParam = year ? year : 'last';
-    const res = await fetch(
-      `https://github-contributions-api.jogruber.de/v4/${userToFetch}?y=${yearParam}`
-    );
-
-    if (!res.ok) throw new Error('Public contributions API failed');
-    const data = await res.json();
-
-    const contributions = {};
-    if (data.contributions) {
-      data.contributions.forEach((day) => {
-        contributions[day.date] = day.count;
-      });
-    }
-
-    return contributions;
-  };
-
-  const fetchContributions = async (userToFetch, token, year = null) => {
-    // Strategy 1: Use GitHub GraphQL API (requires token, gives exact data)
-    if (token) {
-      try {
-        return await fetchContributionsGraphQL(userToFetch, token, year);
-      } catch (err) {
-        console.warn('GraphQL contributions fetch failed, trying fallback:', err.message);
-      }
-    }
-
-    // Strategy 2: Use public contributions API (no token needed)
-    try {
-      return await fetchContributionsPublicAPI(userToFetch, year);
-    } catch (err) {
-      console.warn('Public API contributions fetch failed:', err.message);
-    }
-
-    // Strategy 3: Return empty — show an empty graph rather than fake data
-    return {};
-  };
 
   const fetchGithubData = async (userToFetch = username) => {
     setLoading(true);
@@ -525,10 +187,7 @@ export default function App() {
       );
       const repos = await reposRes.json();
 
-      // Fetch contribution data for current year
-      const currentYear = new Date().getFullYear();
-      const contributions = await fetchContributions(userToFetch, token);
-      const joinedYear = new Date(user.created_at).getFullYear();
+
 
       const langMap = {};
       let total = 0;
@@ -557,20 +216,18 @@ export default function App() {
           language: r.language
         }));
 
-      const totalContributions = Object.values(contributions).reduce((a, b) => a + b, 0);
+
 
       setUserData({
         ...user,
         languages,
         top_repos,
-        contributionsByYear: { [currentYear]: contributions },
-        joinedYear,
-        selectedContribYear: currentYear,
+
         chartStats: [
           { label: "Volume", value: Math.min(100, Math.max(30, user.public_repos * 3)) },
           { label: "Impact", value: Math.min(100, Math.max(20, user.followers * 5)) },
           { label: "Community", value: Math.min(100, Math.max(40, user.following * 4)) },
-          { label: "Consistency", value: Math.min(100, Math.max(30, (totalContributions / 365) * 25)) },
+          { label: "Consistency", value: Math.min(100, Math.max(30, user.public_repos * 2)) },
           { label: "Stack", value: Math.min(100, languages.length * 20) }
         ]
       });
@@ -827,33 +484,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Contribution Graph */}
-              {userData.contributionsByYear && (
-                <div className="pt-2">
-                  <ContributionGraph
-                    contributionsByYear={userData.contributionsByYear}
-                    theme={theme}
-                    joinedYear={userData.joinedYear}
-                    selectedYear={userData.selectedContribYear}
-                    loadingYear={loadingContribYear}
-                    onYearChange={async (year) => {
-                      if (userData.contributionsByYear[year]) {
-                        setUserData(prev => ({ ...prev, selectedContribYear: year }));
-                        return;
-                      }
-                      setLoadingContribYear(true);
-                      setUserData(prev => ({ ...prev, selectedContribYear: year }));
-                      const token = import.meta.env.VITE_GITHUB_TOKEN;
-                      const yearData = await fetchContributions(userData.login, token, year);
-                      setUserData(prev => ({
-                        ...prev,
-                        contributionsByYear: { ...prev.contributionsByYear, [year]: yearData }
-                      }));
-                      setLoadingContribYear(false);
-                    }}
-                  />
-                </div>
-              )}
+
 
               {/* Top Repositories */}
               {userData.top_repos && userData.top_repos.length > 0 && (
