@@ -13,18 +13,18 @@ import {
   TrendingUp,
   Award,
   Layers,
-  Share2
+  Share2,
+  Globe
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
-
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
   </div>
 ));
 
-const Button = ({ children, onClick, variant = "primary", className = "", disabled = false }) => {
+const Button = ({ children, onClick, variant = "primary", className = "", disabled = false, type = "button" }) => {
   const baseStyle =
     "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 active:scale-95";
 
@@ -38,6 +38,7 @@ const Button = ({ children, onClick, variant = "primary", className = "", disabl
 
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={`${baseStyle} ${variants[variant]} ${
@@ -142,6 +143,8 @@ const RadarChart = ({ stats, color, theme }) => {
     </div>
   );
 };
+
+
 
 
 export default function App() {
