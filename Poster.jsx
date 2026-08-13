@@ -15,6 +15,8 @@ import {
   Layers,
   Share2
 } from 'lucide-react';
+import { calculateDeveloperScore } from './src/developerScore.js';
+import DeveloperScore from './src/DeveloperScore.jsx';
 
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
@@ -218,10 +220,14 @@ export default function App() {
 
 
 
+      // Calculate Developer Score from real fetched data
+      const devScore = calculateDeveloperScore(user, repos, languages);
+
       setUserData({
         ...user,
         languages,
         top_repos,
+        developerScore: devScore,
 
         chartStats: [
           { label: "Volume", value: Math.min(100, Math.max(30, user.public_repos * 3)) },
@@ -484,7 +490,14 @@ export default function App() {
                 </div>
               </div>
 
-
+              {/* Developer Score */}
+              {userData.developerScore && (
+                <DeveloperScore
+                  scoreData={userData.developerScore}
+                  theme={theme}
+                  currentTheme={currentTheme}
+                />
+              )}
 
               {/* Top Repositories */}
               {userData.top_repos && userData.top_repos.length > 0 && (
