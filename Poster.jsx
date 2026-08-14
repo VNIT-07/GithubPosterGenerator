@@ -158,28 +158,38 @@ export default function App() {
   const posterRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const suggestionsRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const inputRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
-  // Fetch user suggestions from GitHub Search API
+  // Fetch user suggestions from GitHub Search API (live / dynamic)
   const fetchSuggestions = (query) => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
-    if (query.trim().length < 2) {
+    if (query.trim().length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
+      setSuggestionsLoading(false);
       return;
     }
+
+    setSuggestionsLoading(true);
+    setShowSuggestions(true);
 
     debounceTimerRef.current = setTimeout(async () => {
       const token = import.meta.env.VITE_GITHUB_TOKEN;
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
         const res = await fetch(
-          `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=6`,
-          { headers }
+          `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=7`,
+          { headers, signal: controller.signal }
         );
         if (res.ok) {
           const data = await res.json();
@@ -187,10 +197,12 @@ export default function App() {
           setShowSuggestions(true);
           setActiveSuggestionIndex(-1);
         }
-      } catch {
-        setSuggestions([]);
+      } catch (err) {
+        if (err.name !== 'AbortError') setSuggestions([]);
+      } finally {
+        setSuggestionsLoading(false);
       }
-    }, 300);
+    }, 150);
   };
 
   // Handle selecting a suggestion
@@ -427,32 +439,49 @@ export default function App() {
                 autoComplete="off"
               />
               {/* Suggestions Dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
+              {showSuggestions && (suggestions.length > 0 || suggestionsLoading) && (
                 <div
                   ref={suggestionsRef}
                   className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
-                  style={{ maxHeight: '320px', overflowY: 'auto' }}
+                  style={{ maxHeight: '360px', overflowY: 'auto', animation: 'fadeSlideIn 0.15s ease-out' }}
                 >
-                  {suggestions.map((user, index) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => handleSelectSuggestion(user.login)}
-                      onMouseEnter={() => setActiveSuggestionIndex(index)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
-                        index === activeSuggestionIndex
-                          ? 'bg-blue-50 text-[#0a66c2]'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
-                    >
-                      <img
-                        src={user.avatar_url}
-                        alt={user.login}
-                        className="w-8 h-8 rounded-full border border-gray-200 flex-shrink-0"
-                      />
-                      <span className="text-sm font-medium truncate">{user.login}</span>
-                    </button>
-                  ))}
+                  {suggestionsLoading && suggestions.length === 0 ? (
+                    <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#0a66c2]"></div>
+                      Searching GitHub users…
+                    </div>
+                  ) : (
+                    suggestions.map((user, index) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(user.login)}
+                        onMouseEnter={() => setActiveSuggestionIndex(index)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
+                          index === activeSuggestionIndex
+                            ? 'bg-blue-50 text-[#0a66c2]'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={user.avatar_url}
+                            alt={user.login}
+                            className="w-8 h-8 rounded-full border border-gray-200"
+                          />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold truncate">{user.login}</span>
+                          <span className="text-[11px] text-gray-400 truncate">github.com/{user.login}</span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                  {suggestionsLoading && suggestions.length > 0 && (
+                    <div className="flex items-center justify-center py-2 border-t border-gray-100">
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-[#0a66c2]"></div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
