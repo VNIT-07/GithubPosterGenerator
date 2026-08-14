@@ -173,8 +173,8 @@ export default function App() {
       debounceTimerRef.current = null;
     }
 
-    const trimmed = query.trim();
-    if (trimmed.length < 1) {
+    const clean = extractUsername(query).replace(/^@/, '').trim();
+    if (clean.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       setSuggestionsLoading(false);
@@ -194,7 +194,7 @@ export default function App() {
 
       try {
         const res = await fetch(
-          `https://api.github.com/search/users?q=${encodeURIComponent(trimmed)}&per_page=7`,
+          `https://api.github.com/search/users?q=${encodeURIComponent(clean)}&per_page=7`,
           { headers }
         );
 
@@ -204,19 +204,29 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (currentRequestId !== requestIdRef.current) return;
-          setSuggestions(data.items || []);
+          const items = data.items || [];
+          if (items.length > 0) {
+            setSuggestions(items);
+          } else {
+            setSuggestions([{ id: 'fallback', login: clean, avatar_url: `https://github.com/${clean}.png` }]);
+          }
           setShowSuggestions(true);
           setActiveSuggestionIndex(-1);
+        } else {
+          // On API limit or error, offer exact username fallback
+          setSuggestions([{ id: 'fallback', login: clean, avatar_url: `https://github.com/${clean}.png` }]);
+          setShowSuggestions(true);
         }
       } catch {
         if (currentRequestId !== requestIdRef.current) return;
-        // Network error — keep dropdown open, just clear loading
+        setSuggestions([{ id: 'fallback', login: clean, avatar_url: `https://github.com/${clean}.png` }]);
+        setShowSuggestions(true);
       } finally {
         if (currentRequestId === requestIdRef.current) {
           setSuggestionsLoading(false);
         }
       }
-    }, 150);
+    }, 200);
   };
 
   // Handle selecting a suggestion
@@ -301,7 +311,7 @@ export default function App() {
       const userRes = await fetch(`https://api.github.com/users/${userToFetch}`, { headers });
       if (!userRes.ok) {
         if (userRes.status === 403) {
-          throw new Error("API rate limit exceeded. Add a GitHub token to your .env file or wait a minute.");
+          throw new Error("GitHub API rate limit exceeded. Please wait a minute or set VITE_GITHUB_TOKEN in your build settings.");
         } else if (userRes.status === 404) {
           throw new Error("User not found");
         } else {
@@ -314,7 +324,13 @@ export default function App() {
         `https://api.github.com/users/${userToFetch}/repos?sort=updated&per_page=100`,
         { headers }
       );
-      const repos = await reposRes.json();
+      let repos = [];
+      if (reposRes.ok) {
+        const rawRepos = await reposRes.json();
+        if (Array.isArray(rawRepos)) {
+          repos = rawRepos;
+        }
+      }
 
 
 
@@ -480,7 +496,7 @@ export default function App() {
                 autoComplete="off"
               />
               {/* Suggestions Dropdown */}
-              {showSuggestions && (suggestions.length > 0 || suggestionsLoading) && (
+              {showSuggestions && (
                 <div
                   ref={suggestionsRef}
                   className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
@@ -491,10 +507,10 @@ export default function App() {
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#0a66c2]"></div>
                       Searching GitHub users…
                     </div>
-                  ) : (
+                  ) : suggestions.length > 0 ? (
                     suggestions.map((user, index) => (
                       <button
-                        key={user.id}
+                        key={user.id || user.login}
                         type="button"
                         onClick={() => handleSelectSuggestion(user.login)}
                         onMouseEnter={() => setActiveSuggestionIndex(index)}
@@ -509,6 +525,9 @@ export default function App() {
                             src={user.avatar_url}
                             alt={user.login}
                             className="w-8 h-8 rounded-full border border-gray-200"
+                            onError={(e) => {
+                              e.target.src = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
+                            }}
                           />
                         </div>
                         <div className="flex flex-col min-w-0">
@@ -517,6 +536,14 @@ export default function App() {
                         </div>
                       </button>
                     ))
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSuggestion(extractUsername(inputUsername))}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-600 hover:bg-gray-50"
+                    >
+                      <span>Generate poster for <strong>{extractUsername(inputUsername)}</strong></span>
+                    </button>
                   )}
                   {suggestionsLoading && suggestions.length > 0 && (
                     <div className="flex items-center justify-center py-2 border-t border-gray-100">
