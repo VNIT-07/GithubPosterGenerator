@@ -156,6 +156,89 @@ export default function App() {
   const [theme, setTheme] = useState("professional");
 
   const posterRef = useRef(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const suggestionsRef = useRef(null);
+  const debounceTimerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Fetch user suggestions from GitHub Search API
+  const fetchSuggestions = (query) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      const token = import.meta.env.VITE_GITHUB_TOKEN;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        const res = await fetch(
+          `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=6`,
+          { headers }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(data.items || []);
+          setShowSuggestions(true);
+          setActiveSuggestionIndex(-1);
+        }
+      } catch {
+        setSuggestions([]);
+      }
+    }, 300);
+  };
+
+  // Handle selecting a suggestion
+  const handleSelectSuggestion = (login) => {
+    setInputUsername(login);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setUsername(login);
+    fetchGithubData(login);
+  };
+
+  // Handle keyboard navigation in suggestions
+  const handleInputKeyDown = (e) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveSuggestionIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveSuggestionIndex((prev) =>
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      );
+    } else if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
+      e.preventDefault();
+      handleSelectSuggestion(suggestions[activeSuggestionIndex].login);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getLangColor = (lang) => {
     const colors = {
@@ -326,15 +409,52 @@ export default function App() {
         <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
           {/* Search Form + Buttons */}
           <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2">
-            <div className="relative flex-1">
-              <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <div className="relative flex-1" ref={inputRef}>
+              <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
               <input
                 type="text"
                 value={inputUsername}
-                onChange={(e) => setInputUsername(e.target.value)}
+                onChange={(e) => {
+                  setInputUsername(e.target.value);
+                  fetchSuggestions(e.target.value);
+                }}
+                onKeyDown={handleInputKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
                 placeholder="Username or GitHub URL"
                 className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
+                autoComplete="off"
               />
+              {/* Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
+                  style={{ maxHeight: '320px', overflowY: 'auto' }}
+                >
+                  {suggestions.map((user, index) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => handleSelectSuggestion(user.login)}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
+                        index === activeSuggestionIndex
+                          ? 'bg-blue-50 text-[#0a66c2]'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
+                    >
+                      <img
+                        src={user.avatar_url}
+                        alt={user.login}
+                        className="w-8 h-8 rounded-full border border-gray-200 flex-shrink-0"
+                      />
+                      <span className="text-sm font-medium truncate">{user.login}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <Button type="submit" disabled={loading} className="h-10 whitespace-nowrap">
               {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
