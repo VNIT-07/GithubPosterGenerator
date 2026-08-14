@@ -165,12 +165,29 @@ export default function App() {
   const inputRef = useRef(null);
   const abortControllerRef = useRef(null);
 
+  // Cancel any pending suggestion fetches
+  const cancelSuggestions = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => cancelSuggestions();
+  }, []);
+
   // Fetch user suggestions from GitHub Search API (live / dynamic)
   const fetchSuggestions = (query) => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    if (abortControllerRef.current) abortControllerRef.current.abort();
+    cancelSuggestions();
 
-    if (query.trim().length < 1) {
+    const trimmed = query.trim();
+    if (trimmed.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       setSuggestionsLoading(false);
@@ -188,28 +205,41 @@ export default function App() {
 
       try {
         const res = await fetch(
-          `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=7`,
+          `https://api.github.com/search/users?q=${encodeURIComponent(trimmed)}&per_page=7`,
           { headers, signal: controller.signal }
         );
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestions(data.items || []);
-          setShowSuggestions(true);
-          setActiveSuggestionIndex(-1);
+        if (!controller.signal.aborted) {
+          if (res.ok) {
+            const data = await res.json();
+            setSuggestions(data.items || []);
+            setShowSuggestions(true);
+            setActiveSuggestionIndex(-1);
+          } else {
+            // API error (e.g. rate limit) — hide loading but keep dropdown open if we had results
+            setSuggestionsLoading(false);
+          }
         }
       } catch (err) {
-        if (err.name !== 'AbortError') setSuggestions([]);
+        if (err.name !== 'AbortError') {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
       } finally {
-        setSuggestionsLoading(false);
+        if (!controller.signal.aborted) {
+          setSuggestionsLoading(false);
+        }
       }
     }, 150);
   };
 
   // Handle selecting a suggestion
   const handleSelectSuggestion = (login) => {
-    setInputUsername(login);
-    setShowSuggestions(false);
+    cancelSuggestions();
     setSuggestions([]);
+    setShowSuggestions(false);
+    setSuggestionsLoading(false);
+    setActiveSuggestionIndex(-1);
+    setInputUsername(login);
     setUsername(login);
     fetchGithubData(login);
   };
@@ -379,6 +409,10 @@ export default function App() {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    cancelSuggestions();
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setSuggestionsLoading(false);
     const user = extractUsername(inputUsername);
     if (user) {
       setInputUsername(user);
@@ -432,7 +466,11 @@ export default function App() {
                 }}
                 onKeyDown={handleInputKeyDown}
                 onFocus={() => {
-                  if (suggestions.length > 0) setShowSuggestions(true);
+                  if (suggestions.length > 0) {
+                    setShowSuggestions(true);
+                  } else if (inputUsername.trim().length >= 1) {
+                    fetchSuggestions(inputUsername);
+                  }
                 }}
                 placeholder="Username or GitHub URL"
                 className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
