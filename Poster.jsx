@@ -14,7 +14,10 @@ import {
   Award,
   Layers,
   Share2,
-  Globe
+  Globe,
+  ChevronDown,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
@@ -164,6 +167,41 @@ export default function App() {
   const debounceTimerRef = useRef(null);
   const inputRef = useRef(null);
   const requestIdRef = useRef(0);
+
+  // Multi-format Download & Toast state
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [toast, setToast] = useState(null);
+  const downloadDropdownRef = useRef(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast((curr) => (curr?.message === message ? null : curr));
+    }, 3500);
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (
+        downloadDropdownRef.current &&
+        !downloadDropdownRef.current.contains(e.target)
+      ) {
+        setShowDownloadDropdown(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowDownloadDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Fetch user suggestions from GitHub Search API (live / dynamic)
   const fetchSuggestions = (query) => {
@@ -399,26 +437,248 @@ export default function App() {
     return trimmed;
   };
 
-  const handleDownload = async () => {
+  // ── Multi-Format Export Handlers ───────────────────────
+  const exportPNG = async () => {
     const el = posterRef.current;
-    if (!el) return;
+    if (!el) throw new Error("Profile card element not found");
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = `${userData?.login || 'github'}-profile.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  const exportPDF = async () => {
+    const el = posterRef.current;
+    if (!el) throw new Error("Profile card element not found");
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    const imgData = canvas.toDataURL('image/png');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      throw new Error("Pop-up blocked. Please allow pop-ups for PDF export.");
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${userData?.name || userData?.login || 'GitHub'}-profile.pdf</title>
+          <style>
+            @page { size: auto; margin: 15mm; }
+            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
+            img { max-width: 100%; height: auto; display: block; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+          </style>
+        </head>
+        <body>
+          <img src="${imgData}" onload="window.print();" />
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const exportSVG = async () => {
+    const el = posterRef.current;
+    if (!el) throw new Error("Profile card element not found");
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false,
+    });
+    const imgData = canvas.toDataURL('image/png');
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <image width="${width}" height="${height}" xlink:href="${imgData}"/>
+</svg>`;
+    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `${userData?.login || 'github'}-profile.svg`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportHTML = () => {
+    if (!userData) throw new Error("No profile data available");
+    
+    const title = `${userData.name || userData.login}'s GitHub Profile`;
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 md:p-12 flex items-center justify-center">
+  <div class="max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-200">
+    <!-- Header -->
+    <div class="p-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+      <div class="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+        <img src="${userData.avatar_url}" alt="${userData.login}" class="w-20 h-20 rounded-full border-2 border-white/20 shadow-md">
+        <div class="flex-1 text-center sm:text-left">
+          <h1 class="text-2xl font-bold tracking-tight">${userData.name || userData.login}</h1>
+          <p class="text-sm opacity-80 mt-0.5">@${userData.login}</p>
+          ${userData.bio ? `<p class="text-xs mt-2 opacity-90 line-clamp-2">${userData.bio}</p>` : ''}
+          <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
+            ${userData.location ? `<span>📍 ${userData.location}</span>` : ''}
+            ${userData.company ? `<span>💼 ${userData.company}</span>` : ''}
+            <span>📅 Joined ${new Date(userData.created_at).getFullYear()}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="p-6 space-y-6 text-gray-800">
+      <!-- Stats Bar -->
+      <div class="grid grid-cols-3 gap-3">
+        <div class="p-3 rounded-lg text-center bg-slate-50 border border-slate-100">
+          <span class="block text-xl font-bold">${userData.public_repos}</span>
+          <span class="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Repositories</span>
+        </div>
+        <div class="p-3 rounded-lg text-center bg-slate-50 border border-slate-100">
+          <span class="block text-xl font-bold">${userData.followers}</span>
+          <span class="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Followers</span>
+        </div>
+        <div class="p-3 rounded-lg text-center bg-slate-50 border border-slate-100">
+          <span class="block text-xl font-bold">${userData.following}</span>
+          <span class="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Following</span>
+        </div>
+      </div>
+
+      <!-- Languages -->
+      ${userData.languages && userData.languages.length > 0 ? `
+      <div class="space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Languages</h3>
+        <div class="space-y-2">
+          ${userData.languages.map(lang => `
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs font-medium">
+                <span class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${lang.color}"></span>
+                  ${lang.name}
+                </span>
+                <span class="opacity-75">${lang.percentage}%</span>
+              </div>
+              <div class="w-full h-1.5 bg-gray-200/40 rounded-full overflow-hidden">
+                <div class="h-full rounded-full" style="width: ${lang.percentage}%; background-color: ${lang.color}"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Top Repositories -->
+      ${userData.top_repos && userData.top_repos.length > 0 ? `
+      <div class="space-y-3 pt-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Repositories</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          ${userData.top_repos.map(repo => `
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
+              <p class="text-xs font-semibold truncate">${repo.name}</p>
+              <div class="flex items-center justify-between text-[11px] opacity-75 mt-2">
+                <span>${repo.language || 'Plain'}</span>
+                <span>★ ${repo.stars}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `${userData.login}-profile.html`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportJSON = () => {
+    if (!userData) throw new Error("No profile data available");
+    const exportData = {
+      username: userData.login,
+      name: userData.name,
+      bio: userData.bio,
+      avatar_url: userData.avatar_url,
+      profile_url: userData.html_url || `https://github.com/${userData.login}`,
+      location: userData.location,
+      company: userData.company,
+      joined: userData.created_at,
+      public_repos: userData.public_repos,
+      followers: userData.followers,
+      following: userData.following,
+      developerScore: userData.developerScore || null,
+      top_languages: userData.languages || [],
+      top_repositories: userData.top_repos || [],
+      chart_stats: userData.chartStats || [],
+      exported_at: new Date().toISOString()
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `${userData.login}-profile.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExport = async (format) => {
+    if (!userData) return;
+    setShowDownloadDropdown(false);
+    setIsExporting(true);
 
     try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-      });
-
-      const link = document.createElement('a');
-      link.download = `${userData?.login || 'github'}-poster.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      if (format === 'png') {
+        await exportPNG();
+        showToast('PNG image downloaded successfully!');
+      } else if (format === 'pdf') {
+        await exportPDF();
+        showToast('PDF print preview opened!');
+      } else if (format === 'svg') {
+        await exportSVG();
+        showToast('SVG graphic downloaded successfully!');
+      } else if (format === 'html') {
+        exportHTML();
+        showToast('HTML standalone webpage downloaded!');
+      } else if (format === 'json') {
+        exportJSON();
+        showToast('JSON profile data downloaded!');
+      }
     } catch (err) {
-      console.error('Download failed:', err);
-      alert('Download failed. Please try right-clicking the poster and selecting "Save as image".');
+      console.error(`Export ${format} failed:`, err);
+      showToast(err.message || `Failed to export ${format.toUpperCase()}`, 'error');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -557,10 +817,97 @@ export default function App() {
               {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
               Generate
             </Button>
-            <Button variant="secondary" onClick={handleDownload} disabled={loading || !userData} className="h-10 whitespace-nowrap">
-              <Download className="w-4 h-4" />
-              Download
-            </Button>
+            <div className="relative" ref={downloadDropdownRef}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowDownloadDropdown((prev) => !prev)}
+                disabled={loading || !userData || isExporting}
+                className="h-10 whitespace-nowrap"
+              >
+                {isExporting ? <LoadingSpinner /> : <Download className="w-4 h-4" />}
+                <span>Download</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${showDownloadDropdown ? 'rotate-180' : ''}`} />
+              </Button>
+
+              {showDownloadDropdown && (
+                <div
+                  className="absolute right-0 md:right-auto md:left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 text-left"
+                  style={{ animation: 'fadeSlideIn 0.15s ease-out' }}
+                >
+                  <div className="px-3.5 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                    Download Profile
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => handleExport('png')}
+                    disabled={isExporting}
+                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                  >
+                    <span className="text-base leading-none mt-0.5">🖼</span>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
+                      <div className="text-[11px] text-gray-400">Best for sharing</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport('pdf')}
+                    disabled={isExporting}
+                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                  >
+                    <span className="text-base leading-none mt-0.5">📄</span>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
+                      <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport('svg')}
+                    disabled={isExporting}
+                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                  >
+                    <span className="text-base leading-none mt-0.5">🎨</span>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
+                      <div className="text-[11px] text-gray-400">Scalable graphic</div>
+                    </div>
+                  </button>
+
+                  <div className="my-1.5 border-t border-gray-100"></div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport('html')}
+                    disabled={isExporting}
+                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                  >
+                    <span className="text-base leading-none mt-0.5">🌐</span>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
+                      <div className="text-[11px] text-gray-400">Standalone webpage</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExport('json')}
+                    disabled={isExporting}
+                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                  >
+                    <span className="text-base leading-none mt-0.5">📦</span>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
+                      <div className="text-[11px] text-gray-400">Profile data</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </form>
 
           {/* Divider */}
@@ -742,6 +1089,25 @@ export default function App() {
           </Card>
         ) : null}
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all ${
+            toast.type === 'error'
+              ? 'bg-red-900 text-white border-red-700'
+              : 'bg-slate-900 text-white border-slate-700'
+          }`}
+          style={{ animation: 'fadeSlideIn 0.2s ease-out' }}
+        >
+          {toast.type === 'error' ? (
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+          ) : (
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 }
