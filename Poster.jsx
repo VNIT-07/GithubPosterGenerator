@@ -865,7 +865,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5">🖼</span>
+                    <span className="text-base leading-none mt-0.5"></span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
                       <div className="text-[11px] text-gray-400">Best for sharing</div>
@@ -878,7 +878,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5">📄</span>
+                    <span className="text-base leading-none mt-0.5"></span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
                       <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
@@ -891,7 +891,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5">🎨</span>
+                    <span className="text-base leading-none mt-0.5"></span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
                       <div className="text-[11px] text-gray-400">Scalable graphic</div>
@@ -906,7 +906,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5">🌐</span>
+                    <span className="text-base leading-none mt-0.5"></span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
                       <div className="text-[11px] text-gray-400">Standalone webpage</div>
@@ -919,7 +919,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5">📦</span>
+                    <span className="text-base leading-none mt-0.5"></span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
                       <div className="text-[11px] text-gray-400">Profile data</div>
