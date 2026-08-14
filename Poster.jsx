@@ -163,69 +163,56 @@ export default function App() {
   const suggestionsRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const inputRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
 
-  // Cancel any pending suggestion fetches
-  const cancelSuggestions = () => {
+  // Fetch user suggestions from GitHub Search API (live / dynamic)
+  const fetchSuggestions = (query) => {
+    // Clear any pending debounce
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => cancelSuggestions();
-  }, []);
-
-  // Fetch user suggestions from GitHub Search API (live / dynamic)
-  const fetchSuggestions = (query) => {
-    cancelSuggestions();
 
     const trimmed = query.trim();
     if (trimmed.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       setSuggestionsLoading(false);
+      requestIdRef.current++;
       return;
     }
 
     setSuggestionsLoading(true);
     setShowSuggestions(true);
 
+    // Increment request ID so stale responses are ignored
+    const currentRequestId = ++requestIdRef.current;
+
     debounceTimerRef.current = setTimeout(async () => {
       const token = import.meta.env.VITE_GITHUB_TOKEN;
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
 
       try {
         const res = await fetch(
           `https://api.github.com/search/users?q=${encodeURIComponent(trimmed)}&per_page=7`,
-          { headers, signal: controller.signal }
+          { headers }
         );
-        if (!controller.signal.aborted) {
-          if (res.ok) {
-            const data = await res.json();
-            setSuggestions(data.items || []);
-            setShowSuggestions(true);
-            setActiveSuggestionIndex(-1);
-          } else {
-            // API error (e.g. rate limit) — hide loading but keep dropdown open if we had results
-            setSuggestionsLoading(false);
-          }
+
+        // Only apply results if this is still the latest request
+        if (currentRequestId !== requestIdRef.current) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (currentRequestId !== requestIdRef.current) return;
+          setSuggestions(data.items || []);
+          setShowSuggestions(true);
+          setActiveSuggestionIndex(-1);
         }
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          setSuggestions([]);
-          setShowSuggestions(false);
-        }
+      } catch {
+        if (currentRequestId !== requestIdRef.current) return;
+        // Network error — keep dropdown open, just clear loading
       } finally {
-        if (!controller.signal.aborted) {
+        if (currentRequestId === requestIdRef.current) {
           setSuggestionsLoading(false);
         }
       }
@@ -234,7 +221,11 @@ export default function App() {
 
   // Handle selecting a suggestion
   const handleSelectSuggestion = (login) => {
-    cancelSuggestions();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    requestIdRef.current++;
     setSuggestions([]);
     setShowSuggestions(false);
     setSuggestionsLoading(false);
@@ -409,7 +400,11 @@ export default function App() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    cancelSuggestions();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    requestIdRef.current++;
     setSuggestions([]);
     setShowSuggestions(false);
     setSuggestionsLoading(false);
