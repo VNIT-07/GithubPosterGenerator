@@ -299,7 +299,15 @@ export default function App() {
 
     try {
       const userRes = await fetch(`https://api.github.com/users/${userToFetch}`, { headers });
-      if (!userRes.ok) throw new Error("User not found");
+      if (!userRes.ok) {
+        if (userRes.status === 403) {
+          throw new Error("API rate limit exceeded. Add a GitHub token to your .env file or wait a minute.");
+        } else if (userRes.status === 404) {
+          throw new Error("User not found");
+        } else {
+          throw new Error(`GitHub API error (${userRes.status})`);
+        }
+      }
       const user = await userRes.json();
 
       const reposRes = await fetch(
