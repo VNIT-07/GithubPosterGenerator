@@ -17,7 +17,10 @@ import {
   Globe,
   ChevronDown,
   Check,
-  AlertCircle
+  AlertCircle,
+  X,
+  Eye,
+  Copy
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
@@ -168,10 +171,12 @@ export default function App() {
   const inputRef = useRef(null);
   const requestIdRef = useRef(0);
 
-  // Multi-format Download & Toast state
+  // Multi-format Download, Preview Modal & Toast state
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState(null);
+  const [previewModal, setPreviewModal] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const downloadDropdownRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
@@ -193,6 +198,7 @@ export default function App() {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setShowDownloadDropdown(false);
+        setPreviewModal(null);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -437,88 +443,10 @@ export default function App() {
     return trimmed;
   };
 
-  // ── Multi-Format Export Handlers ───────────────────────
-  const exportPNG = async () => {
-    const el = posterRef.current;
-    if (!el) throw new Error("Profile card element not found");
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: null,
-      logging: false,
-    });
-    const link = document.createElement('a');
-    link.download = `${userData?.login || 'github'}-profile.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-
-  const exportPDF = async () => {
-    const el = posterRef.current;
-    if (!el) throw new Error("Profile card element not found");
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
-    const imgData = canvas.toDataURL('image/png');
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      throw new Error("Pop-up blocked. Please allow pop-ups for PDF export.");
-    }
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${userData?.name || userData?.login || 'GitHub'}-profile.pdf</title>
-          <style>
-            @page { size: auto; margin: 15mm; }
-            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
-            img { max-width: 100%; height: auto; display: block; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-          </style>
-        </head>
-        <body>
-          <img src="${imgData}" onload="window.print();" />
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  const exportSVG = async () => {
-    const el = posterRef.current;
-    if (!el) throw new Error("Profile card element not found");
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: null,
-      logging: false,
-    });
-    const imgData = canvas.toDataURL('image/png');
-    const width = el.offsetWidth;
-    const height = el.offsetHeight;
-    const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <image width="${width}" height="${height}" xlink:href="${imgData}"/>
-</svg>`;
-    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `${userData?.login || 'github'}-profile.svg`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportHTML = () => {
-    if (!userData) throw new Error("No profile data available");
-    
-    const title = `${userData.name || userData.login}'s GitHub Profile`;
-    const htmlContent = `<!DOCTYPE html>
+  // ── Multi-Format Export & Preview Handlers ────────────
+  const generateHTMLContent = (data) => {
+    const title = `${data.name || data.login}'s GitHub Profile`;
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -526,53 +454,45 @@ export default function App() {
   <title>${title}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-  </style>
+  <style> body { font-family: 'Inter', sans-serif; } </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 md:p-12 flex items-center justify-center">
   <div class="max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-200">
-    <!-- Header -->
     <div class="p-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
       <div class="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-        <img src="${userData.avatar_url}" alt="${userData.login}" class="w-20 h-20 rounded-full border-2 border-white/20 shadow-md">
+        <img src="${data.avatar_url}" alt="${data.login}" class="w-20 h-20 rounded-full border-2 border-white/20 shadow-md">
         <div class="flex-1 text-center sm:text-left">
-          <h1 class="text-2xl font-bold tracking-tight">${userData.name || userData.login}</h1>
-          <p class="text-sm opacity-80 mt-0.5">@${userData.login}</p>
-          ${userData.bio ? `<p class="text-xs mt-2 opacity-90 line-clamp-2">${userData.bio}</p>` : ''}
+          <h1 class="text-2xl font-bold tracking-tight">${data.name || data.login}</h1>
+          <p class="text-sm opacity-80 mt-0.5">@${data.login}</p>
+          ${data.bio ? `<p class="text-xs mt-2 opacity-90 line-clamp-2">${data.bio}</p>` : ''}
           <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
-            ${userData.location ? `<span>📍 ${userData.location}</span>` : ''}
-            ${userData.company ? `<span>💼 ${userData.company}</span>` : ''}
-            <span>📅 Joined ${new Date(userData.created_at).getFullYear()}</span>
+            ${data.location ? `<span>📍 ${data.location}</span>` : ''}
+            ${data.company ? `<span>💼 ${data.company}</span>` : ''}
+            <span>📅 Joined ${new Date(data.created_at).getFullYear()}</span>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Body -->
     <div class="p-6 space-y-6 text-gray-800">
-      <!-- Stats Bar -->
       <div class="grid grid-cols-3 gap-3">
         <div class="p-3 rounded-lg text-center bg-slate-50 border border-slate-100">
-          <span class="block text-xl font-bold">${userData.public_repos}</span>
+          <span class="block text-xl font-bold">${data.public_repos}</span>
           <span class="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Repositories</span>
         </div>
         <div class="p-3 rounded-lg text-center bg-slate-50 border border-slate-100">
-          <span class="block text-xl font-bold">${userData.followers}</span>
+          <span class="block text-xl font-bold">${data.followers}</span>
           <span class="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Followers</span>
         </div>
         <div class="p-3 rounded-lg text-center bg-slate-50 border border-slate-100">
-          <span class="block text-xl font-bold">${userData.following}</span>
+          <span class="block text-xl font-bold">${data.following}</span>
           <span class="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Following</span>
         </div>
       </div>
-
-      <!-- Languages -->
-      ${userData.languages && userData.languages.length > 0 ? `
+      ${data.languages && data.languages.length > 0 ? `
       <div class="space-y-3">
         <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Languages</h3>
         <div class="space-y-2">
-          ${userData.languages.map(lang => `
+          ${data.languages.map(lang => `
             <div class="space-y-1">
               <div class="flex justify-between text-xs font-medium">
                 <span class="flex items-center gap-1.5">
@@ -589,13 +509,11 @@ export default function App() {
         </div>
       </div>
       ` : ''}
-
-      <!-- Top Repositories -->
-      ${userData.top_repos && userData.top_repos.length > 0 ? `
+      ${data.top_repos && data.top_repos.length > 0 ? `
       <div class="space-y-3 pt-2">
         <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Repositories</h3>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          ${userData.top_repos.map(repo => `
+          ${data.top_repos.map(repo => `
             <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
               <p class="text-xs font-semibold truncate">${repo.name}</p>
               <div class="flex items-center justify-between text-[11px] opacity-75 mt-2">
@@ -611,74 +529,176 @@ export default function App() {
   </div>
 </body>
 </html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `${userData.login}-profile.html`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
-  const exportJSON = () => {
-    if (!userData) throw new Error("No profile data available");
-    const exportData = {
-      username: userData.login,
-      name: userData.name,
-      bio: userData.bio,
-      avatar_url: userData.avatar_url,
-      profile_url: userData.html_url || `https://github.com/${userData.login}`,
-      location: userData.location,
-      company: userData.company,
-      joined: userData.created_at,
-      public_repos: userData.public_repos,
-      followers: userData.followers,
-      following: userData.following,
-      developerScore: userData.developerScore || null,
-      top_languages: userData.languages || [],
-      top_repositories: userData.top_repos || [],
-      chart_stats: userData.chartStats || [],
+  const generateJSONData = (data) => {
+    return {
+      username: data.login,
+      name: data.name,
+      bio: data.bio,
+      avatar_url: data.avatar_url,
+      profile_url: data.html_url || `https://github.com/${data.login}`,
+      location: data.location,
+      company: data.company,
+      joined: data.created_at,
+      public_repos: data.public_repos,
+      followers: data.followers,
+      following: data.following,
+      developerScore: data.developerScore || null,
+      top_languages: data.languages || [],
+      top_repositories: data.top_repos || [],
+      chart_stats: data.chartStats || [],
       exported_at: new Date().toISOString()
     };
-
-    const jsonString = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `${userData.login}-profile.json`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
-  const handleExport = async (format) => {
+  const openExportPreview = async (format) => {
     if (!userData) return;
     setShowDownloadDropdown(false);
+    setPreviewLoading(true);
+
+    try {
+      const el = posterRef.current;
+      const login = userData.login || 'github';
+
+      if (format === 'png') {
+        if (!el) throw new Error("Profile card element not found");
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: null, logging: false });
+        const dataUrl = canvas.toDataURL('image/png');
+        setPreviewModal({
+          format: 'png',
+          title: 'PNG Image Preview',
+          subtitle: 'High-quality profile image ready for download',
+          filename: `${login}-profile.png`,
+          previewUrl: dataUrl,
+          dataUrl: dataUrl
+        });
+      } else if (format === 'pdf') {
+        if (!el) throw new Error("Profile card element not found");
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false });
+        const dataUrl = canvas.toDataURL('image/png');
+        setPreviewModal({
+          format: 'pdf',
+          title: 'PDF Print Preview',
+          subtitle: 'Printable profile layout ready for export',
+          filename: `${login}-profile.pdf`,
+          previewUrl: dataUrl,
+          dataUrl: dataUrl
+        });
+      } else if (format === 'svg') {
+        if (!el) throw new Error("Profile card element not found");
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: null, logging: false });
+        const dataUrl = canvas.toDataURL('image/png');
+        const width = el.offsetWidth;
+        const height = el.offsetHeight;
+        const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <image width="${width}" height="${height}" xlink:href="${dataUrl}"/>
+</svg>`;
+        setPreviewModal({
+          format: 'svg',
+          title: 'SVG Graphic Preview',
+          subtitle: 'Scalable graphic element ready for download',
+          filename: `${login}-profile.svg`,
+          previewUrl: dataUrl,
+          content: svgContent
+        });
+      } else if (format === 'html') {
+        const htmlContent = generateHTMLContent(userData);
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        setPreviewModal({
+          format: 'html',
+          title: 'HTML Standalone Preview',
+          subtitle: 'Self-contained webpage export preview',
+          filename: `${login}-profile.html`,
+          previewUrl: blobUrl,
+          content: htmlContent
+        });
+      } else if (format === 'json') {
+        const exportObj = generateJSONData(userData);
+        const jsonStr = JSON.stringify(exportObj, null, 2);
+        setPreviewModal({
+          format: 'json',
+          title: 'JSON Profile Data Preview',
+          subtitle: 'Structured developer analytics & profile data',
+          filename: `${login}-profile.json`,
+          content: jsonStr
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to prepare ${format} preview:`, err);
+      showToast(err.message || `Failed to generate ${format.toUpperCase()} preview`, 'error');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const confirmDownload = () => {
+    if (!previewModal) return;
     setIsExporting(true);
 
     try {
+      const { format, filename, dataUrl, content } = previewModal;
+
       if (format === 'png') {
-        await exportPNG();
-        showToast('PNG image downloaded successfully!');
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        link.click();
       } else if (format === 'pdf') {
-        await exportPDF();
-        showToast('PDF print preview opened!');
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) throw new Error("Pop-up blocked. Please allow pop-ups for PDF export.");
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${filename}</title>
+              <style>
+                @page { size: auto; margin: 15mm; }
+                body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
+                img { max-width: 100%; height: auto; display: block; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+              </style>
+            </head>
+            <body>
+              <img src="${dataUrl}" onload="window.print();" />
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
       } else if (format === 'svg') {
-        await exportSVG();
-        showToast('SVG graphic downloaded successfully!');
+        const blob = new Blob([content], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
       } else if (format === 'html') {
-        exportHTML();
-        showToast('HTML standalone webpage downloaded!');
+        const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
       } else if (format === 'json') {
-        exportJSON();
-        showToast('JSON profile data downloaded!');
+        const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
       }
+
+      showToast(`Downloaded ${filename} successfully!`);
     } catch (err) {
-      console.error(`Export ${format} failed:`, err);
-      showToast(err.message || `Failed to export ${format.toUpperCase()}`, 'error');
+      console.error('Download error:', err);
+      showToast(err.message || 'Download failed', 'error');
     } finally {
       setIsExporting(false);
+      setPreviewModal(null);
     }
   };
 
@@ -841,11 +861,11 @@ export default function App() {
                   
                   <button
                     type="button"
-                    onClick={() => handleExport('png')}
+                    onClick={() => openExportPreview('png')}
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">🖼</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
                       <div className="text-[11px] text-gray-400">Best for sharing</div>
@@ -854,11 +874,11 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={() => handleExport('pdf')}
+                    onClick={() => openExportPreview('pdf')}
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">📄</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
                       <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
@@ -867,11 +887,11 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={() => handleExport('svg')}
+                    onClick={() => openExportPreview('svg')}
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">🎨</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
                       <div className="text-[11px] text-gray-400">Scalable graphic</div>
@@ -882,11 +902,11 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={() => handleExport('html')}
+                    onClick={() => openExportPreview('html')}
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">🌐</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
                       <div className="text-[11px] text-gray-400">Standalone webpage</div>
@@ -895,11 +915,11 @@ export default function App() {
 
                   <button
                     type="button"
-                    onClick={() => handleExport('json')}
+                    onClick={() => openExportPreview('json')}
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">📦</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
                       <div className="text-[11px] text-gray-400">Profile data</div>
@@ -1089,6 +1109,108 @@ export default function App() {
           </Card>
         ) : null}
       </div>
+
+      {/* Export Preview Modal */}
+      {(previewLoading || previewModal) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-200">
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]"
+            style={{ animation: 'fadeSlideIn 0.2s ease-out' }}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-50 text-[#0a66c2]">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                    {previewModal?.title || 'Preparing Preview...'}
+                    {previewModal?.format && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-[#0a66c2]">
+                        {previewModal.format}
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-gray-500">{previewModal?.subtitle || 'Generating export file'}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewModal(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body Preview Area */}
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col justify-center items-center bg-slate-100/50 min-h-[300px]">
+              {previewLoading ? (
+                <div className="flex flex-col items-center gap-3 p-8">
+                  <LoadingSpinner />
+                  <p className="text-xs text-gray-500 font-medium">Generating export preview…</p>
+                </div>
+              ) : previewModal?.format === 'json' ? (
+                <div className="w-full relative bg-slate-900 text-slate-100 rounded-xl p-4 text-xs font-mono overflow-x-auto max-h-[400px] shadow-inner">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(previewModal.content);
+                      setPreviewModal(prev => ({ ...prev, isCopied: true }));
+                      setTimeout(() => setPreviewModal(prev => prev ? ({ ...prev, isCopied: false }) : null), 2000);
+                    }}
+                    className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-sans border border-slate-700 transition-colors"
+                  >
+                    {previewModal.isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {previewModal.isCopied ? 'Copied!' : 'Copy JSON'}
+                  </button>
+                  <pre className="pr-20">{previewModal.content}</pre>
+                </div>
+              ) : previewModal?.format === 'html' ? (
+                <div className="w-full h-[400px] rounded-xl overflow-hidden border border-gray-200 shadow-md bg-white">
+                  <iframe
+                    src={previewModal.previewUrl}
+                    title="HTML Export Preview"
+                    className="w-full h-full border-none"
+                  />
+                </div>
+              ) : previewModal?.previewUrl ? (
+                <div className="max-w-full overflow-hidden rounded-xl border border-gray-200 shadow-lg bg-white p-2">
+                  <img
+                    src={previewModal.previewUrl}
+                    alt="Export Preview"
+                    className="max-h-[380px] w-auto object-contain rounded-lg"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-white">
+              <span className="text-xs font-mono text-gray-400 truncate max-w-[220px]">
+                {previewModal?.filename}
+              </span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => setPreviewModal(null)}
+                  className="text-xs h-9 px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={confirmDownload}
+                  disabled={previewLoading || !previewModal}
+                  className="text-xs h-9 px-4 gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download {previewModal?.format?.toUpperCase()}</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (
