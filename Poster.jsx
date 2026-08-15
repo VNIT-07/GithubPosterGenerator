@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
+import ShareDialog from './src/ShareDialog.jsx';
+import { saveProfileSnapshot, getPublicProfileUrl } from './src/profileStorage.js';
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
@@ -154,6 +156,8 @@ export default function App() {
   const [error, setError] = useState(null);
   const [userData, setUserData] = useState(null);
   const [theme, setTheme] = useState("professional");
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
 
   const posterRef = useRef(null);
 
@@ -282,6 +286,24 @@ export default function App() {
     }
   };
 
+  const handleShare = () => {
+    if (!userData) return;
+    try {
+      const snapshot = saveProfileSnapshot({
+        userData,
+        theme,
+        visibility: 'public'
+      });
+      const url = getPublicProfileUrl(userData.login, snapshot);
+      setShareUrl(url);
+    } catch (err) {
+      console.error('Share failed:', err);
+      const fallbackUrl = getPublicProfileUrl(userData.login);
+      setShareUrl(fallbackUrl);
+    }
+    setShowShareModal(true);
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     const user = extractUsername(inputUsername);
@@ -343,6 +365,10 @@ export default function App() {
             <Button variant="secondary" onClick={handleDownload} disabled={loading || !userData} className="h-10 whitespace-nowrap">
               <Download className="w-4 h-4" />
               Download
+            </Button>
+            <Button variant="secondary" onClick={handleShare} disabled={loading || !userData} className="h-10 whitespace-nowrap">
+              <Share2 className="w-4 h-4" />
+              Share
             </Button>
           </form>
 
@@ -525,6 +551,16 @@ export default function App() {
           </Card>
         ) : null}
       </div>
+
+      {/* Share Modal */}
+      {userData && (
+        <ShareDialog
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          username={userData.name || userData.login}
+          profileUrl={shareUrl || getPublicProfileUrl(userData.login)}
+        />
+      )}
     </div>
   );
 }
