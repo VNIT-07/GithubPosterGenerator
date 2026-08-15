@@ -767,105 +767,104 @@ export default function App() {
     }
   };
 
-  const currentTheme = themeStyles[theme];
-
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
       {/* Controls Container */}
-      <div className="max-w-4xl mx-auto mb-8 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-          {/* Search Form + Buttons */}
-          <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2">
-            <div className="relative flex-1" ref={inputRef}>
-              <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
-              <input
-                type="text"
-                value={inputUsername}
-                onChange={(e) => {
-                  setInputUsername(e.target.value);
-                  fetchSuggestions(e.target.value);
-                }}
-                onKeyDown={handleInputKeyDown}
-                onFocus={() => {
-                  if (suggestions.length > 0) {
-                    setShowSuggestions(true);
-                  } else if (inputUsername.trim().length >= 1) {
-                    fetchSuggestions(inputUsername);
-                  }
-                }}
-                placeholder="Username or GitHub URL"
-                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
-                autoComplete="off"
-              />
-              {/* Suggestions Dropdown */}
-              {showSuggestions && (
-                <div
-                  ref={suggestionsRef}
-                  className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
-                  style={{ maxHeight: '360px', overflowY: 'auto', animation: 'fadeSlideIn 0.15s ease-out' }}
-                >
-                  {suggestionsLoading && suggestions.length === 0 ? (
-                    <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#0a66c2]"></div>
-                      Searching GitHub users…
-                    </div>
-                  ) : suggestions.length > 0 ? (
-                    suggestions.map((user, index) => (
-                      <button
-                        key={user.id || user.login}
-                        type="button"
-                        onClick={() => handleSelectSuggestion(user.login)}
-                        onMouseEnter={() => setActiveSuggestionIndex(index)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
-                          index === activeSuggestionIndex
-                            ? 'bg-blue-50 text-[#0a66c2]'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
-                      >
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={user.avatar_url}
-                            alt={user.login}
-                            className="w-8 h-8 rounded-full border border-gray-200"
-                            onError={(e) => {
-                              e.target.src = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
-                            }}
-                          />
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-semibold truncate">{user.login}</span>
-                          <span className="text-[11px] text-gray-400 truncate">github.com/{user.login}</span>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
+      <div className="max-w-4xl mx-auto mb-8 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+        {/* Row 1: Search Bar + Generate + Download */}
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="relative flex-1" ref={inputRef}>
+            <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+            <input
+              type="text"
+              value={inputUsername}
+              onChange={(e) => {
+                setInputUsername(e.target.value);
+                fetchSuggestions(e.target.value);
+              }}
+              onKeyDown={handleInputKeyDown}
+              onFocus={() => {
+                if (suggestions.length > 0) {
+                  setShowSuggestions(true);
+                } else if (inputUsername.trim().length >= 1) {
+                  fetchSuggestions(inputUsername);
+                }
+              }}
+              placeholder="Username or GitHub URL"
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
+              autoComplete="off"
+            />
+            {/* Suggestions Dropdown */}
+            {showSuggestions && (
+              <div
+                ref={suggestionsRef}
+                className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
+                style={{ maxHeight: '360px', overflowY: 'auto', animation: 'fadeSlideIn 0.15s ease-out' }}
+              >
+                {suggestionsLoading && suggestions.length === 0 ? (
+                  <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#0a66c2]"></div>
+                    Searching GitHub users…
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  suggestions.map((user, index) => (
                     <button
+                      key={user.id || user.login}
                       type="button"
-                      onClick={() => handleSelectSuggestion(extractUsername(inputUsername))}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-600 hover:bg-gray-50"
+                      onClick={() => handleSelectSuggestion(user.login)}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
+                        index === activeSuggestionIndex
+                          ? 'bg-blue-50 text-[#0a66c2]'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
                     >
-                      <span>Generate poster for <strong>{extractUsername(inputUsername)}</strong></span>
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={user.avatar_url}
+                          alt={user.login}
+                          className="w-8 h-8 rounded-full border border-gray-200"
+                          onError={(e) => {
+                            e.target.src = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold truncate">{user.login}</span>
+                        <span className="text-[11px] text-gray-400 truncate">github.com/{user.login}</span>
+                      </div>
                     </button>
-                  )}
-                  {suggestionsLoading && suggestions.length > 0 && (
-                    <div className="flex items-center justify-center py-2 border-t border-gray-100">
-                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-[#0a66c2]"></div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <Button type="submit" disabled={loading} className="h-10 whitespace-nowrap">
+                  ))
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectSuggestion(extractUsername(inputUsername))}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    <span>Generate poster for <strong>{extractUsername(inputUsername)}</strong></span>
+                  </button>
+                )}
+                {suggestionsLoading && suggestions.length > 0 && (
+                  <div className="flex items-center justify-center py-2 border-t border-gray-100">
+                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-[#0a66c2]"></div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button type="submit" disabled={loading} className="h-10 whitespace-nowrap flex-1 sm:flex-none justify-center">
               {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
               Generate
             </Button>
-            <div className="relative" ref={downloadDropdownRef}>
+            <div className="relative flex-1 sm:flex-none" ref={downloadDropdownRef}>
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => setShowDownloadDropdown((prev) => !prev)}
                 disabled={loading || !userData || isExporting}
-                className="h-10 whitespace-nowrap"
+                className="h-10 whitespace-nowrap w-full justify-center"
               >
                 {isExporting ? <LoadingSpinner /> : <Download className="w-4 h-4" />}
                 <span>Download</span>
@@ -874,7 +873,7 @@ export default function App() {
 
               {showDownloadDropdown && (
                 <div
-                  className="absolute right-0 md:right-auto md:left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 text-left"
+                  className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 text-left"
                   style={{ animation: 'fadeSlideIn 0.15s ease-out' }}
                 >
                   <div className="px-3.5 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
@@ -887,7 +886,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">🖼️</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
                       <div className="text-[11px] text-gray-400">Best for sharing</div>
@@ -900,7 +899,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">📄</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
                       <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
@@ -913,7 +912,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">📐</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
                       <div className="text-[11px] text-gray-400">Scalable graphic</div>
@@ -928,7 +927,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">🌐</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
                       <div className="text-[11px] text-gray-400">Standalone webpage</div>
@@ -941,7 +940,7 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <span className="text-base leading-none mt-0.5"></span>
+                    <span className="text-base leading-none mt-0.5">📊</span>
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
                       <div className="text-[11px] text-gray-400">Profile data</div>
@@ -950,17 +949,22 @@ export default function App() {
                 </div>
               )}
             </div>
-            <Button variant="secondary" onClick={handleShare} disabled={loading || !userData} className="h-10 whitespace-nowrap">
-              <Share2 className="w-4 h-4" />
-              Share
-            </Button>
-          </form>
+          </div>
+        </form>
 
-          {/* Divider */}
-          <div className="hidden md:block w-px h-8 bg-gray-200"></div>
+        {/* Row 2: Share Button + Theme Dropdown */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+          <Button
+            variant="secondary"
+            onClick={handleShare}
+            disabled={loading || !userData}
+            className="h-10 whitespace-nowrap text-sm"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share</span>
+          </Button>
 
-          {/* Theme Selector */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">Theme:</span>
             <select
