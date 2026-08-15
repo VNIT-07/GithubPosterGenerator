@@ -1,5 +1,3 @@
-import LZString from 'lz-string';
-
 const STORAGE_KEY = 'gh_poster_published_profiles';
 
 /**
@@ -39,15 +37,11 @@ function saveAllProfiles(profiles) {
 
 /**
  * Encode profile snapshot into a compressed URL-safe string.
- * Uses LZString if available, or native base64 fallback.
+ * Uses native UTF-8 base64 URL safe encoding.
  */
 export function encodeSnapshot(snapshot) {
   try {
     const jsonStr = JSON.stringify(snapshot);
-    if (typeof LZString !== 'undefined' && LZString?.compressToEncodedURIComponent) {
-      return LZString.compressToEncodedURIComponent(jsonStr);
-    }
-    // Native UTF-8 base64 URL safe fallback
     return btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => {
       return String.fromCharCode('0x' + p1);
     })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -63,11 +57,6 @@ export function encodeSnapshot(snapshot) {
 export function decodeSnapshot(encodedStr) {
   if (!encodedStr) return null;
   try {
-    if (typeof LZString !== 'undefined' && LZString?.decompressFromEncodedURIComponent) {
-      const decompressed = LZString.decompressFromEncodedURIComponent(encodedStr);
-      if (decompressed) return JSON.parse(decompressed);
-    }
-    // Native base64 decode fallback
     let base64 = encodedStr.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
     const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(base64), (c) => {
