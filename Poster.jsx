@@ -963,21 +963,22 @@ export default function App() {
           <div className="flex items-center gap-2 shrink-0">
             <Layers className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">Theme:</span>
-            <div className="flex bg-gray-100 p-1 rounded-lg">
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              className="h-10 px-3 pr-8 text-xs font-semibold capitalize bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0a66c2] focus:border-[#0a66c2] cursor-pointer appearance-none transition-all hover:bg-gray-50"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 10px center',
+              }}
+            >
               {["professional", "cyberpunk", "minimal"].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTheme(t)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md capitalize transition-all ${
-                    theme === t
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
-                >
-                  {t}
-                </button>
+                <option key={t} value={t}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
         </div>
       </div>
