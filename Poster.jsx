@@ -62,7 +62,10 @@ const LoadingSpinner = () => (
   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
 );
 
-const RadarChart = ({ stats, color, theme }) => {
+const RadarChart = ({ stats = [], color, theme }) => {
+  const safeStats = Array.isArray(stats) ? stats : [];
+  if (safeStats.length === 0) return null;
+
   const size = 180;
   const center = size / 2;
   const radius = size / 2 - 25;
@@ -73,7 +76,8 @@ const RadarChart = ({ stats, color, theme }) => {
     return data
       .map((point, i) => {
         const angle = i * angleStep - Math.PI / 2;
-        const value = (point.value / 100) * r;
+        const val = Number(point?.value) || 0;
+        const value = (val / 100) * r;
         const x = center + Math.cos(angle) * value;
         const y = center + Math.sin(angle) * value;
         return `${x},${y}`;
@@ -81,7 +85,7 @@ const RadarChart = ({ stats, color, theme }) => {
       .join(" ");
   };
 
-  const points = getPoints(stats, radius);
+  const points = getPoints(safeStats, radius);
   const gridColor =
     theme === "cyberpunk" ? "rgba(0, 255, 255, 0.2)" : "#e5e7eb";
   const textColor =
@@ -102,8 +106,8 @@ const RadarChart = ({ stats, color, theme }) => {
           />
         ))}
 
-        {stats.map((_, i) => {
-          const angle = (i * (Math.PI * 2) / stats.length) - Math.PI / 2;
+        {safeStats.map((_, i) => {
+          const angle = (i * (Math.PI * 2) / safeStats.length) - Math.PI / 2;
           const x = center + Math.cos(angle) * radius;
           const y = center + Math.sin(angle) * radius;
           return (
@@ -126,8 +130,8 @@ const RadarChart = ({ stats, color, theme }) => {
           strokeWidth="2"
         />
 
-        {stats.map((stat, i) => {
-          const angle = (i * (Math.PI * 2) / stats.length) - Math.PI / 2;
+        {safeStats.map((stat, i) => {
+          const angle = (i * (Math.PI * 2) / safeStats.length) - Math.PI / 2;
           const labelRadius = radius + 15;
           const x = center + Math.cos(angle) * labelRadius;
           const y = center + Math.sin(angle) * labelRadius;
@@ -385,34 +389,43 @@ export default function App() {
       const langMap = {};
       let total = 0;
 
-      repos.forEach((repo) => {
-        if (repo.language) {
-          langMap[repo.language] = (langMap[repo.language] || 0) + 1;
-          total++;
-        }
-      });
+      if (Array.isArray(repos)) {
+        repos.forEach((repo) => {
+          if (repo && repo.language) {
+            langMap[repo.language] = (langMap[repo.language] || 0) + 1;
+            total++;
+          }
+        });
+      }
 
-      const languages = Object.entries(langMap)
-        .map(([name, count]) => ({
-          name,
-          percentage: Math.round((count / total) * 100),
-          color: getLangColor(name)
-        }))
-        .slice(0, 5);
+      const languages = total > 0
+        ? Object.entries(langMap)
+            .map(([name, count]) => ({
+              name,
+              percentage: Math.round((count / total) * 100),
+              color: getLangColor(name)
+            }))
+            .slice(0, 5)
+        : [];
 
-      const top_repos = repos
-        .sort((a, b) => b.stargazers_count - a.stargazers_count)
-        .slice(0, 3)
-        .map((r) => ({
-          name: r.name,
-          stars: r.stargazers_count,
-          language: r.language
-        }));
-
-
+      const top_repos = Array.isArray(repos)
+        ? repos
+            .sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0))
+            .slice(0, 3)
+            .map((r) => ({
+              name: r.name,
+              stars: r.stargazers_count || 0,
+              language: r.language
+            }))
+        : [];
 
       // Calculate Developer Score from real fetched data
       const devScore = calculateDeveloperScore(user, repos, languages);
+
+      const reposCount = Number(user?.public_repos) || 0;
+      const followersCount = Number(user?.followers) || 0;
+      const followingCount = Number(user?.following) || 0;
+      const langsCount = Array.isArray(languages) ? languages.length : 0;
 
       setUserData({
         ...user,
@@ -421,15 +434,16 @@ export default function App() {
         developerScore: devScore,
 
         chartStats: [
-          { label: "Volume", value: Math.min(100, Math.max(30, user.public_repos * 3)) },
-          { label: "Impact", value: Math.min(100, Math.max(20, user.followers * 5)) },
-          { label: "Community", value: Math.min(100, Math.max(40, user.following * 4)) },
-          { label: "Consistency", value: Math.min(100, Math.max(30, user.public_repos * 2)) },
-          { label: "Stack", value: Math.min(100, languages.length * 20) }
+          { label: "Volume", value: Math.min(100, Math.max(30, reposCount * 3)) },
+          { label: "Impact", value: Math.min(100, Math.max(20, followersCount * 5)) },
+          { label: "Community", value: Math.min(100, Math.max(40, followingCount * 4)) },
+          { label: "Consistency", value: Math.min(100, Math.max(30, reposCount * 2)) },
+          { label: "Stack", value: Math.min(100, langsCount * 20) }
         ]
       });
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to fetch GitHub profile:", err);
+      setError(err.message || "Failed to load GitHub profile");
     } finally {
       setLoading(false);
     }
