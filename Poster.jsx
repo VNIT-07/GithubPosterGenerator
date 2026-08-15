@@ -859,16 +859,6 @@ export default function App() {
               {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
               Generate
             </Button>
-<<<<<<< HEAD
-            <Button variant="secondary" onClick={handleDownload} disabled={loading || !userData} className="h-10 whitespace-nowrap">
-              <Download className="w-4 h-4" />
-              Download
-            </Button>
-            <Button variant="secondary" onClick={handleShare} disabled={loading || !userData} className="h-10 whitespace-nowrap">
-              <Share2 className="w-4 h-4" />
-              Share
-            </Button>
-=======
             <div className="relative" ref={downloadDropdownRef}>
               <Button
                 type="button"
@@ -960,7 +950,10 @@ export default function App() {
                 </div>
               )}
             </div>
->>>>>>> c1023630753775bc089359c31d9766c63d0cca50
+            <Button variant="secondary" onClick={handleShare} disabled={loading || !userData} className="h-10 whitespace-nowrap">
+              <Share2 className="w-4 h-4" />
+              Share
+            </Button>
           </form>
 
           {/* Divider */}
@@ -1143,7 +1136,6 @@ export default function App() {
         ) : null}
       </div>
 
-<<<<<<< HEAD
       {/* Share Modal */}
       {userData && (
         <ShareDialog
@@ -1152,7 +1144,8 @@ export default function App() {
           username={userData.name || userData.login}
           profileUrl={shareUrl || getPublicProfileUrl(userData.login)}
         />
-=======
+      )}
+
       {/* Export Preview Modal */}
       {(previewLoading || previewModal) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-200">
@@ -1272,7 +1265,6 @@ export default function App() {
           )}
           <span>{toast.message}</span>
         </div>
->>>>>>> c1023630753775bc089359c31d9766c63d0cca50
       )}
     </div>
   );
