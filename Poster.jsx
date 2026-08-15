@@ -160,8 +160,22 @@ const RadarChart = ({ stats = [], color, theme }) => {
 
 
 export default function App() {
-  const [username, setUsername] = useState("VNIT-07");
-  const [inputUsername, setInputUsername] = useState("VNIT-07");
+  const getInitialUser = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const u = params.get('u') || params.get('user');
+      if (u) return u.trim();
+      const hashMatch = window.location.hash.match(/#\/u\/([a-zA-Z0-9_-]+)/);
+      if (hashMatch) return hashMatch[1];
+    } catch {
+      // fallback
+    }
+    return "VNIT-07";
+  };
+
+  const initialUser = getInitialUser();
+  const [username, setUsername] = useState(initialUser);
+  const [inputUsername, setInputUsername] = useState(initialUser);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -722,19 +736,8 @@ export default function App() {
 
   const handleShare = () => {
     if (!userData) return;
-    try {
-      const snapshot = saveProfileSnapshot({
-        userData,
-        theme,
-        visibility: 'public'
-      });
-      const url = getPublicProfileUrl(userData.login, snapshot);
-      setShareUrl(url);
-    } catch (err) {
-      console.error('Share failed:', err);
-      const fallbackUrl = getPublicProfileUrl(userData.login);
-      setShareUrl(fallbackUrl);
-    }
+    const url = getPublicProfileUrl(userData.login);
+    setShareUrl(url);
     setShowShareModal(true);
   };
 

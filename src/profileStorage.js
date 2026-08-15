@@ -180,22 +180,8 @@ export function unpublishProfile(username) {
   return false;
 }
 
-/**
- * Get absolute public URL for a given profile.
- */
-export function getPublicProfileUrl(username, snapshot = null) {
-  const slug = normalizeUsername(username);
+export function getPublicProfileUrl(username) {
+  const cleanUser = username ? username.trim() : 'VNIT-07';
   const baseUrl = window.location.origin + window.location.pathname;
-
-  let url = `${baseUrl}#/u/${slug}`;
-
-  // If a snapshot is provided, attach compressed payload for cross-device/incognito sharing
-  if (snapshot) {
-    const encoded = encodeSnapshot(snapshot);
-    if (encoded) {
-      url += `?d=${encoded}`;
-    }
-  }
-
-  return url;
+  return `${baseUrl}?u=${encodeURIComponent(cleanUser)}`;
 }
