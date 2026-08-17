@@ -13,7 +13,7 @@ A modern, dynamic React application that generates customizable, high-resolution
 ## Live Demo
 
 Experience the live app directly in your browser:  
-**[https://github-poster-generator.vercel.app](https://github-poster-generator.vercel.app)**
+**[github-poster-generator.vercel.app](https://github-poster-generator.vercel.app)**
 
 ---
 
