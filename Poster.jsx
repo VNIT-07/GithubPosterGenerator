@@ -501,9 +501,9 @@ export default function App() {
           <p class="text-sm opacity-80 mt-0.5">@${data.login}</p>
           ${data.bio ? `<p class="text-xs mt-2 opacity-90 line-clamp-2">${data.bio}</p>` : ''}
           <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
-            ${data.location ? `<span>📍 ${data.location}</span>` : ''}
-            ${data.company ? `<span>💼 ${data.company}</span>` : ''}
-            <span>📅 Joined ${new Date(data.created_at).getFullYear()}</span>
+            ${data.location ? `<span> ${data.location}</span>` : ''}
+            ${data.company ? `<span> ${data.company}</span>` : ''}
+            <span> Joined ${new Date(data.created_at).getFullYear()}</span>
           </div>
         </div>
       </div>
