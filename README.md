@@ -1,6 +1,5 @@
 # GitHub Developer Profile Poster Generator
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-https://github-poster-generator.vercel.app-0a66c2?style=for-the-badge&logo=google-chrome&logoColor=white)](https://github-poster-generator.vercel.app)
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
