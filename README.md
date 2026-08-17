@@ -1,4 +1,4 @@
-# GitHub Developer Profile Poster Generator 🎨
+# GitHub Developer Profile Poster Generator
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-githubpostergenerator.com-0a66c2?style=for-the-badge&logo=google-chrome&logoColor=white)](https://githubpostergenerator.com)
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
@@ -10,34 +10,34 @@ A modern, dynamic React application that generates customizable, high-resolution
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
 Experience the live app directly in your browser:  
-👉 **[https://githubpostergenerator.com](https://githubpostergenerator.com)**
+**[https://githubpostergenerator.com](https://githubpostergenerator.com)**
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔍 **Live Autocomplete User Search**: Real-time username suggestions with avatar previews powered by the GitHub Search API, equipped with automatic URL parsing and rate-limit fallbacks.
-- 📊 **Developer Skill & Activity Matrix**: Interactive radar chart evaluating **Volume**, **Impact**, **Community**, **Consistency**, and **Stack** capabilities.
-- 🏆 **Developer Score Index**: Real-time calculated developer rating badge based on public repository contributions, followers, stack diversity, and star impact.
-- 🎨 **Multi-Theme System**:
-  - 💼 **Professional**: Clean, corporate LinkedIn-inspired design.
-  - ⚡ **Cyberpunk**: Dark futuristic aesthetic with glowing cyan accents.
-  - 🏛️ **Minimal**: Subtle, stone-themed minimalist presentation.
-- 📥 **Multi-Format Export Engine with Live Preview**:
-  - 🖼️ **PNG** — High-definition image download (`.png`) for social sharing.
-  - 📄 **PDF** — Printable profile layout (`.pdf`) tailored for resumes and printing.
-  - 🎨 **SVG** — Vector graphic (`.svg`) for scalable design integrations.
-  - 🌐 **HTML** — Standalone web page (`.html`) containing the complete profile layout.
-  - 📦 **JSON** — Structured raw data (`.json`) with an interactive **Copy JSON** utility.
-- 👁️ **Interactive Modal Preview**: Inspect the exact generated file preview before downloading.
-- 📱 **Fully Responsive**: Seamless performance across mobile, tablet, and desktop viewports.
+- **Live Autocomplete User Search**: Real-time username suggestions with avatar previews powered by the GitHub Search API, equipped with automatic URL parsing and rate-limit fallbacks.
+- **Developer Skill & Activity Matrix**: Interactive radar chart evaluating **Volume**, **Impact**, **Community**, **Consistency**, and **Stack** capabilities.
+- **Developer Score Index**: Real-time calculated developer rating badge based on public repository contributions, followers, stack diversity, and star impact.
+- **Multi-Theme System**:
+  - **Professional**: Clean, corporate LinkedIn-inspired design.
+  - **Cyberpunk**: Dark futuristic aesthetic with glowing cyan accents.
+  - **Minimal**: Subtle, stone-themed minimalist presentation.
+- **Multi-Format Export Engine with Live Preview**:
+  - **PNG** — High-definition image download (`.png`) for social sharing.
+  - **PDF** — Printable profile layout (`.pdf`) tailored for resumes and printing.
+  - **SVG** — Vector graphic (`.svg`) for scalable design integrations.
+  - **HTML** — Standalone web page (`.html`) containing the complete profile layout.
+  - **JSON** — Structured raw data (`.json`) with an interactive **Copy JSON** utility.
+- **Interactive Modal Preview**: Inspect the exact generated file preview before downloading.
+- **Fully Responsive**: Seamless performance across mobile, tablet, and desktop viewports.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Framework**: React 18
 - **Build Tool**: Vite 6
@@ -48,7 +48,7 @@ Experience the live app directly in your browser:
 
 ---
 
-## 🚀 Quick Start / Local Setup
+## Quick Start / Local Setup
 
 Follow these steps to run the application locally:
 
@@ -80,17 +80,17 @@ Open your browser and navigate to `http://localhost:3000`.
 
 ---
 
-## 🔑 Setting Environment Variables for Live Deployments
+## Setting Environment Variables for Live Deployments
 
 When deploying to hosting platforms like **GitHub Pages**, **Vercel**, or **Netlify**:
 
 - **Vercel / Netlify / Cloudflare Pages**:
-  1. Go to your project **Settings** → **Environment Variables**.
+  1. Go to your project **Settings** -> **Environment Variables**.
   2. Add `VITE_GITHUB_TOKEN` = `your_token_value`.
   3. Redeploy your project.
 
 - **GitHub Pages (with GitHub Actions)**:
-  1. Go to Repository **Settings** → **Secrets and variables** → **Actions**.
+  1. Go to Repository **Settings** -> **Secrets and variables** -> **Actions**.
   2. Add a new repository secret named `VITE_GITHUB_TOKEN`.
   3. Reference the secret in your build workflow:
      ```yaml
@@ -100,7 +100,7 @@ When deploying to hosting platforms like **GitHub Pages**, **Vercel**, or **Netl
 
 ---
 
-## 📁 Repository Architecture
+## Repository Architecture
 
 ```text
 GithubPosterGenerator/
@@ -118,6 +118,6 @@ GithubPosterGenerator/
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
