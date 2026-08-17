@@ -20,7 +20,10 @@ import {
   AlertCircle,
   X,
   Eye,
-  Copy
+  Copy,
+  Image,
+  FileText,
+  FileCode
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
@@ -905,7 +908,11 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
+<<<<<<< HEAD
                     <span className="text-base leading-none mt-0.5">🖼️</span>
+=======
+                    <Image className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+>>>>>>> b423083 (feat: add icons to export menu and overhaul README with feature documentation and setup instructions)
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
                       <div className="text-[11px] text-gray-400">Best for sharing</div>
@@ -918,7 +925,11 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
+<<<<<<< HEAD
                     <span className="text-base leading-none mt-0.5">📄</span>
+=======
+                    <FileText className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+>>>>>>> b423083 (feat: add icons to export menu and overhaul README with feature documentation and setup instructions)
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
                       <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
@@ -931,7 +942,11 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
+<<<<<<< HEAD
                     <span className="text-base leading-none mt-0.5">📐</span>
+=======
+                    <Code className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+>>>>>>> b423083 (feat: add icons to export menu and overhaul README with feature documentation and setup instructions)
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
                       <div className="text-[11px] text-gray-400">Scalable graphic</div>
@@ -946,7 +961,11 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
+<<<<<<< HEAD
                     <span className="text-base leading-none mt-0.5">🌐</span>
+=======
+                    <Globe className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+>>>>>>> b423083 (feat: add icons to export menu and overhaul README with feature documentation and setup instructions)
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
                       <div className="text-[11px] text-gray-400">Standalone webpage</div>
@@ -959,7 +978,11 @@ export default function App() {
                     disabled={isExporting}
                     className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
                   >
+<<<<<<< HEAD
                     <span className="text-base leading-none mt-0.5">📊</span>
+=======
+                    <FileCode className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+>>>>>>> b423083 (feat: add icons to export menu and overhaul README with feature documentation and setup instructions)
                     <div>
                       <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
                       <div className="text-[11px] text-gray-400">Profile data</div>

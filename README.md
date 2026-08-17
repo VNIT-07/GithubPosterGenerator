@@ -1,100 +1,123 @@
-# Github Poster Generator 🎨
+# GitHub Developer Profile Poster Generator 🎨
 
-A sleek, dynamic React component that generates a customizable, shareable infographic/poster card showcasing GitHub user stats, top languages, top repositories, and activity radar charts.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-githubpostergenerator.com-0a66c2?style=for-the-badge&logo=google-chrome&logoColor=white)](https://githubpostergenerator.com)
+[![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-## Features ✨
-
-- **User Search**: Instantly fetch profile data for any public GitHub username.
-- **Top Languages Breakdown**: Visual percentage breakdown of languages used across repositories.
-- **Top Repositories**: Showcase top starred repositories with star counts and primary languages.
-- **Developer Radar Chart**: Interactive radar graph rating development volume, impact, community, consistency, and stack versatility.
-- **Multiple Visual Themes**:
-  - **Professional**: Clean, corporate LinkedIn-style aesthetic.
-  - **Cyberpunk**: Dark neon glow theme for futuristic vibes.
-  - **Minimal**: Subtle, modern minimalist style.
-
-## Tech Stack 🛠️
-
-- **React** (Hooks, SVG rendering)
-- **Lucide React** (Icons)
-- **Tailwind CSS** (Styling & utility classes)
-- **GitHub REST API** (User & repository statistics)
-
-## Quick Start / How to Run 🚀
-
-Since this repository contains a standalone React component ([Poster.jsx](file:///Users/pc5/Documents/Vinit/GithubPosterGenerator/Poster.jsx)), you can run it in a React application environment using **Vite** or **Next.js/Create-React-App**.
+A modern, dynamic React application that generates customizable, high-resolution infographic posters and developer profile analytics cards from any GitHub user profile.
 
 ---
 
-### Option A: Create a New Vite React Project (Recommended)
+## 🌐 Live Demo
 
-1. **Create a Vite React app** inside a project folder:
-   ```bash
-   npx create-vite@latest my-app --template react
-   cd my-app
-   ```
-
-2. **Install required dependencies**:
-   ```bash
-   npm install lucide-react
-   npm install -D tailwindcss postcss autoprefixer
-   npx tailwindcss init -p
-   ```
-
-3. **Configure Tailwind CSS** in `tailwind.config.js`:
-   ```javascript
-   /** @type {import('tailwindcss').Config} */
-   export default {
-     content: [
-       "./index.html",
-       "./src/**/*.{js,ts,jsx,tsx}",
-     ],
-     theme: {
-       extend: {},
-     },
-     plugins: [],
-   }
-   ```
-
-4. **Add Tailwind directives** to `src/index.css`:
-   ```css
-   @tailwind base;
-   @tailwind components;
-   @tailwind utilities;
-   ```
-
-5. **Copy [Poster.jsx](file:///Users/pc5/Documents/Vinit/GithubPosterGenerator/Poster.jsx)** into your `src/` directory.
-
-6. **Import and render `Poster`** in `src/App.jsx`:
-   ```jsx
-   import Poster from './Poster';
-
-   function App() {
-     return <Poster />;
-   }
-
-   export default App;
-   ```
-
-7. **Start the development server**:
-   ```bash
-   npm run dev
-   ```
-   Open the browser URL (typically `http://localhost:5173`) to view and interact with the application.
+Experience the live app directly in your browser:  
+👉 **[https://githubpostergenerator.com](https://githubpostergenerator.com)**
 
 ---
 
-### Option B: Integration into an Existing React Project
+## ✨ Features
 
-1. Copy [Poster.jsx](file:///Users/pc5/Documents/Vinit/GithubPosterGenerator/Poster.jsx) into your React project.
-2. Install [lucide-react](https://lucide.dev):
-   ```bash
-   npm install lucide-react
-   ```
-3. Ensure **Tailwind CSS** is installed and configured in your project.
-4. Import and render `<Poster />` in your page or view component.
+- 🔍 **Live Autocomplete User Search**: Real-time username suggestions with avatar previews powered by the GitHub Search API, equipped with automatic URL parsing and rate-limit fallbacks.
+- 📊 **Developer Skill & Activity Matrix**: Interactive radar chart evaluating **Volume**, **Impact**, **Community**, **Consistency**, and **Stack** capabilities.
+- 🏆 **Developer Score Index**: Real-time calculated developer rating badge based on public repository contributions, followers, stack diversity, and star impact.
+- 🎨 **Multi-Theme System**:
+  - 💼 **Professional**: Clean, corporate LinkedIn-inspired design.
+  - ⚡ **Cyberpunk**: Dark futuristic aesthetic with glowing cyan accents.
+  - 🏛️ **Minimal**: Subtle, stone-themed minimalist presentation.
+- 📥 **Multi-Format Export Engine with Live Preview**:
+  - 🖼️ **PNG** — High-definition image download (`.png`) for social sharing.
+  - 📄 **PDF** — Printable profile layout (`.pdf`) tailored for resumes and printing.
+  - 🎨 **SVG** — Vector graphic (`.svg`) for scalable design integrations.
+  - 🌐 **HTML** — Standalone web page (`.html`) containing the complete profile layout.
+  - 📦 **JSON** — Structured raw data (`.json`) with an interactive **Copy JSON** utility.
+- 👁️ **Interactive Modal Preview**: Inspect the exact generated file preview before downloading.
+- 📱 **Fully Responsive**: Seamless performance across mobile, tablet, and desktop viewports.
 
+---
 
-## License 📄
+## 🛠️ Tech Stack
 
-This project is licensed under the MIT License - see the [LICENSE](file:///Users/pc5/Documents/Vinit/GithubPosterGenerator/LICENSE) file for details.
+- **Framework**: React 18
+- **Build Tool**: Vite 6
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Canvas / Export Engine**: html2canvas
+- **Data Source**: GitHub REST API
+
+---
+
+## 🚀 Quick Start / Local Setup
+
+Follow these steps to run the application locally:
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/VNIT-07/GithubPosterGenerator.git
+cd GithubPosterGenerator
+```
+
+### 2. Install dependencies
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables (Optional but Recommended)
+To prevent GitHub API rate limits (60 requests/hour unauthenticated vs. 5,000 requests/hour authenticated), create a `.env` file in the root directory:
+
+```env
+VITE_GITHUB_TOKEN=your_github_personal_access_token
+```
+
+> **Note**: Generate a Personal Access Token (Classic with no special scopes required) at [GitHub Token Settings](https://github.com/settings/tokens).
+
+### 4. Run the Development Server
+```bash
+npm run dev
+```
+Open your browser and navigate to `http://localhost:3000`.
+
+---
+
+## 🔑 Setting Environment Variables for Live Deployments
+
+When deploying to hosting platforms like **GitHub Pages**, **Vercel**, or **Netlify**:
+
+- **Vercel / Netlify / Cloudflare Pages**:
+  1. Go to your project **Settings** → **Environment Variables**.
+  2. Add `VITE_GITHUB_TOKEN` = `your_token_value`.
+  3. Redeploy your project.
+
+- **GitHub Pages (with GitHub Actions)**:
+  1. Go to Repository **Settings** → **Secrets and variables** → **Actions**.
+  2. Add a new repository secret named `VITE_GITHUB_TOKEN`.
+  3. Reference the secret in your build workflow:
+     ```yaml
+     env:
+       VITE_GITHUB_TOKEN: ${{ secrets.VITE_GITHUB_TOKEN }}
+     ```
+
+---
+
+## 📁 Repository Architecture
+
+```text
+GithubPosterGenerator/
+├── Poster.jsx             # Main Application Component & Multi-format Export System
+├── src/
+│   ├── DeveloperScore.jsx # Developer Score Visual Component
+│   ├── developerScore.js  # Score Metric Calculation Logic
+│   ├── main.jsx           # React Root Entry Point
+│   └── index.css          # Tailwind Directives & Animations
+├── CNAME                  # Custom Domain Configuration (githubpostergenerator.com)
+├── package.json           # Scripts & Dependencies
+├── vite.config.js         # Vite Server Configuration
+└── README.md              # Project Documentation
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
