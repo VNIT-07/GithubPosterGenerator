@@ -1,13 +1,12 @@
 /**
  * Vercel Serverless Function: Active Visitors Heartbeat
  * 
- * Tracks real-time active visitors using Upstash Redis Sorted Sets (ZSET) with TTL.
- * Zero external npm dependencies (native fetch against Upstash REST API).
- * Includes graceful in-memory fallback for local development or when Redis is unconfigured.
+ * Tracks real-time active visitors across every device using Upstash Redis Sorted Sets (ZSET) with TTL.
+ * Lightweight, zero-dependency REST API execution with in-memory fallback.
  */
 
 const REDIS_KEY = 'github_poster_active_visitors';
-const TTL_SECONDS = 75; // 75-second sliding window
+const TTL_SECONDS = 30; // 30-second sliding window for snappy multi-device response
 const TTL_MS = TTL_SECONDS * 1000;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -26,14 +25,14 @@ function cleanMemorySessions(now) {
 
 function checkRateLimit(sessionId, now) {
   const lastTime = rateLimitMap.get(sessionId) || 0;
-  // Limit to at most 1 request per 2.5 seconds per session ID
-  if (now - lastTime < 2500) {
+  // Allow at most 1 request per 800ms per session ID
+  if (now - lastTime < 800) {
     return false;
   }
   rateLimitMap.set(sessionId, now);
 
   // Clean rate limit map periodically
-  if (rateLimitMap.size > 5000) {
+  if (rateLimitMap.size > 2000) {
     const cutoff = now - 60000;
     for (const [id, time] of rateLimitMap.entries()) {
       if (time < cutoff) rateLimitMap.delete(id);
@@ -74,7 +73,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -109,7 +108,6 @@ export default async function handler(req, res) {
     }
 
     if (!checkRateLimit(sessionId, now)) {
-      // Throttle politely without failing the client
       cleanMemorySessions(now);
       return res.status(200).json({
         count: Math.max(1, memorySessions.size),
@@ -119,7 +117,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── 1. Redis Mode ──────────────────────────────────────────────────────────
+  // ── 1. Redis Mode (Production across all devices) ──────────────────────────
   if (redisConfig) {
     try {
       let pipelineCommands = [];
@@ -141,13 +139,12 @@ export default async function handler(req, res) {
           ['ZADD', REDIS_KEY, now, sessionId],
           ['ZREMRANGEBYSCORE', REDIS_KEY, 0, threshold],
           ['ZCARD', REDIS_KEY],
-          ['EXPIRE', REDIS_KEY, 86400], // 24h key retention
+          ['EXPIRE', REDIS_KEY, 86400],
         ];
       }
 
       const results = await executeRedisPipeline(redisConfig, pipelineCommands);
 
-      // Extract ZCARD result from the pipeline
       let count = 1;
       const cardResult = results.find((r, idx) => {
         const cmd = pipelineCommands[idx][0];
@@ -167,7 +164,6 @@ export default async function handler(req, res) {
       });
     } catch (redisError) {
       console.warn('Redis presence tracking encountered an error, using fallback:', redisError.message);
-      // Fall through to in-memory fallback
     }
   }
 
