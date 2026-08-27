@@ -25,6 +25,7 @@ Experience the live app directly in your browser:
   - **Professional**: Clean, corporate LinkedIn-inspired design.
   - **Cyberpunk**: Dark futuristic aesthetic with glowing cyan accents.
   - **Minimal**: Subtle, stone-themed minimalist presentation.
+- **Real-Time Live Visitor Counter**: Serverless active presence tracking powered by an anonymous UUID heartbeat mechanism and Upstash Redis sliding-window TTL, optimized with the Page Visibility API.
 - **Multi-Format Export Engine with Live Preview**:
   - **PNG** — High-definition image download (`.png`) for social sharing.
   - **PDF** — Printable profile layout (`.pdf`) tailored for resumes and printing.
@@ -44,6 +45,7 @@ Experience the live app directly in your browser:
 - **Icons**: Lucide React
 - **Canvas / Export Engine**: html2canvas
 - **Data Source**: GitHub REST API
+- **Live Presence & Persistence**: Upstash Redis (REST API) & Vercel Serverless Functions
 
 ---
 
@@ -63,13 +65,22 @@ npm install
 ```
 
 ### 3. Configure Environment Variables (Optional but Recommended)
-To prevent GitHub API rate limits (60 requests/hour unauthenticated vs. 5,000 requests/hour authenticated), create a `.env` file in the root directory:
+To prevent GitHub API rate limits and enable real-time visitor tracking across multiple deployments, create a `.env` file from the provided template:
 
-```env
-VITE_GITHUB_TOKEN=your_github_personal_access_token
+```bash
+cp .env.example .env
 ```
 
-> **Note**: Generate a Personal Access Token (Classic with no special scopes required) at [GitHub Token Settings](https://github.com/settings/tokens).
+```env
+# GitHub Personal Access Token (Increases rate limits from 60 to 5,000 req/hr)
+VITE_GITHUB_TOKEN=your_github_personal_access_token
+
+# Upstash Redis (For Real-Time Global Visitor Counter)
+UPSTASH_REDIS_REST_URL=https://your-database-id.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
+```
+
+> **Note**: If Upstash Redis credentials are not configured, the application automatically runs with a built-in local in-memory fallback with zero setup required.
 
 ### 4. Run the Development Server
 ```bash
@@ -81,21 +92,14 @@ Open your browser and navigate to `http://localhost:3000`.
 
 ## Setting Environment Variables for Live Deployments
 
-When deploying to hosting platforms like **GitHub Pages**, **Vercel**, or **Netlify**:
+When deploying to hosting platforms like **Vercel**:
 
-- **Vercel / Netlify / Cloudflare Pages**:
-  1. Go to your project **Settings** -> **Environment Variables**.
-  2. Add `VITE_GITHUB_TOKEN` = `your_token_value`.
-  3. Redeploy your project.
-
-- **GitHub Pages (with GitHub Actions)**:
-  1. Go to Repository **Settings** -> **Secrets and variables** -> **Actions**.
-  2. Add a new repository secret named `VITE_GITHUB_TOKEN`.
-  3. Reference the secret in your build workflow:
-     ```yaml
-     env:
-       VITE_GITHUB_TOKEN: ${{ secrets.VITE_GITHUB_TOKEN }}
-     ```
+1. Go to your project **Settings** -> **Environment Variables**.
+2. Add the following keys:
+   - `VITE_GITHUB_TOKEN` = `your_token_value`
+   - `UPSTASH_REDIS_REST_URL` = `your_upstash_url`
+   - `UPSTASH_REDIS_REST_TOKEN` = `your_upstash_token`
+3. Redeploy your project.
 
 ---
 
@@ -103,16 +107,26 @@ When deploying to hosting platforms like **GitHub Pages**, **Vercel**, or **Netl
 
 ```text
 GithubPosterGenerator/
-├── Poster.jsx             # Main Application Component & Multi-format Export System
+├── api/
+│   └── visitors/
+│       ├── heartbeat.js       # Vercel Serverless Function (Upstash Redis Presence & TTL)
+│       └── index.js           # API Entry Point for Visitor Count
+├── Poster.jsx                 # Main Application Component & Multi-format Export System
 ├── src/
-│   ├── DeveloperScore.jsx # Developer Score Visual Component
-│   ├── developerScore.js  # Score Metric Calculation Logic
-│   ├── main.jsx           # React Root Entry Point
-│   └── index.css          # Tailwind Directives & Animations
-├── CNAME                  # Custom Domain Configuration (githubpostergenerator.com)
-├── package.json           # Scripts & Dependencies
-├── vite.config.js         # Vite Server Configuration
-└── README.md              # Project Documentation
+│   ├── DeveloperScore.jsx     # Developer Score Visual Component
+│   ├── developerScore.js      # Score Metric Calculation Logic
+│   ├── LiveVisitorCounter.jsx # Real-time Live Visitor Counter Badge Component
+│   ├── visitorSession.js      # Anonymous UUID & Heartbeat Dispatcher
+│   ├── profileStorage.js      # Profile Storage & Dynamic URL Link Utilities
+│   ├── ShareDialog.jsx        # Social Share & Link Copy Dialog
+│   ├── shared.jsx             # Shared UI Components & Design Tokens
+│   ├── main.jsx               # React Root Entry Point
+│   └── index.css              # Tailwind Directives & Animations
+├── .env.example               # Environment Variables Template
+├── CNAME                      # Custom Domain Configuration (githubpostergenerator.com)
+├── package.json               # Scripts & Dependencies
+├── vite.config.js             # Vite Server Configuration & Local API Dev Middleware
+└── README.md                  # Project Documentation
 ```
 
 ---

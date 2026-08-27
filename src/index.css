@@ -29,10 +29,12 @@
   }
 }
 
-/* Disable score animations for users who prefer reduced motion */
+/* Disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .score-ring-progress,
-  .score-bar-fill {
+  .score-bar-fill,
+  .animate-ping,
+  .animate-pulse {
     transition: none !important;
     animation: none !important;
   }

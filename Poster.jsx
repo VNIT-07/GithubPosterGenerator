@@ -3,8 +3,6 @@ import html2canvas from 'html2canvas';
 import { 
   Github, 
   Code,
-  Users, 
-  GitBranch, 
   MapPin, 
   Calendar, 
   Download, 
@@ -23,12 +21,15 @@ import {
   Copy,
   Image,
   FileText,
-  FileCode
+  FileCode,
+  ExternalLink,
+  Star
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
 import ShareDialog from './src/ShareDialog.jsx';
-import { saveProfileSnapshot, getPublicProfileUrl } from './src/profileStorage.js';
+import LiveVisitorCounter from './src/LiveVisitorCounter.jsx';
+import { getPublicProfileUrl } from './src/profileStorage.js';
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
@@ -501,9 +502,9 @@ export default function App() {
           <p class="text-sm opacity-80 mt-0.5">@${data.login}</p>
           ${data.bio ? `<p class="text-xs mt-2 opacity-90 line-clamp-2">${data.bio}</p>` : ''}
           <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
-            ${data.location ? `<span> ${data.location}</span>` : ''}
-            ${data.company ? `<span> ${data.company}</span>` : ''}
-            <span> Joined ${new Date(data.created_at).getFullYear()}</span>
+            ${data.location ? `<span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>${data.location}</span>` : ''}
+            ${data.company ? `<span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>${data.company}</span>` : ''}
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>Joined ${new Date(data.created_at).getFullYear()}</span>
           </div>
         </div>
       </div>
@@ -553,7 +554,7 @@ export default function App() {
               <p class="text-xs font-semibold truncate">${repo.name}</p>
               <div class="flex items-center justify-between text-[11px] opacity-75 mt-2">
                 <span>${repo.language || 'Plain'}</span>
-                <span>★ ${repo.stars}</span>
+                <span class="flex items-center gap-1"><svg class="w-3 h-3 text-amber-500 fill-amber-500 inline" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>${repo.stars}</span>
               </div>
             </div>
           `).join('')}
@@ -974,17 +975,20 @@ export default function App() {
           </div>
         </form>
 
-        {/* Row 2: Share Button + Theme Dropdown */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <Button
-            variant="secondary"
-            onClick={handleShare}
-            disabled={loading || !userData}
-            className="h-10 whitespace-nowrap text-sm"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Share</span>
-          </Button>
+        {/* Row 2: Share Button + Live Visitor Pill + Theme Dropdown */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleShare}
+              disabled={loading || !userData}
+              className="h-10 whitespace-nowrap text-sm"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share</span>
+            </Button>
+            <LiveVisitorCounter variant="compact" />
+          </div>
 
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-gray-500" />
@@ -1035,17 +1039,16 @@ export default function App() {
                   <h1 className="text-2xl font-bold tracking-tight">
                     {userData.name || userData.login}
                   </h1>
-                  <p className="text-sm opacity-80 flex items-center justify-center sm:justify-start gap-1 mt-0.5">
-                    @{userData.login}
+                  <p className="text-sm opacity-80 flex items-center justify-center sm:justify-start gap-1.5 mt-0.5">
+                    <span>@{userData.login}</span>
                     <a
                       href={`https://github.com/${userData.login}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       title={`View ${userData.login}'s GitHub profile`}
                       className="inline-flex items-center opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-110"
-                      style={{ textDecoration: 'none', fontSize: '0.85em' }}
                     >
-                      🔗
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </p>
                   {userData.bio && (
@@ -1151,7 +1154,10 @@ export default function App() {
                         <p className="text-xs font-semibold truncate">{repo.name}</p>
                         <div className="flex items-center justify-between text-[11px] opacity-75 mt-2">
                           <span>{repo.language || "Plain"}</span>
-                          <span>★ {repo.stars}</span>
+                          <span className="flex items-center gap-1">
+                            <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                            {repo.stars}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -1162,6 +1168,26 @@ export default function App() {
           </Card>
         ) : null}
       </div>
+
+      {/* Footer & Live Stats */}
+      <footer className="max-w-4xl mx-auto mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="flex items-center gap-3">
+          <LiveVisitorCounter />
+        </div>
+        <div className="flex items-center gap-4 text-center sm:text-right">
+          <a
+            href="https://github.com/VNIT-07/GithubPosterGenerator"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-slate-600 hover:text-[#0a66c2] transition-colors font-medium"
+          >
+            <Github className="w-3.5 h-3.5" />
+            <span>GitHub</span>
+          </a>
+          <span className="text-slate-300">•</span>
+          <span>MIT License</span>
+        </div>
+      </footer>
 
       {/* Share Modal */}
       {userData && (
