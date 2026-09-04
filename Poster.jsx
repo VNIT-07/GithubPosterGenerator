@@ -23,12 +23,14 @@ import {
   FileText,
   FileCode,
   ExternalLink,
-  Star
+  Star,
+  Users
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
 import ShareDialog from './src/ShareDialog.jsx';
 import LiveVisitorCounter from './src/LiveVisitorCounter.jsx';
+import FollowersFollowingModal from './src/FollowersFollowingModal.jsx';
 import { getPublicProfileUrl } from './src/profileStorage.js';
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
@@ -186,6 +188,8 @@ export default function App() {
   const [theme, setTheme] = useState("professional");
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const [followModalOpen, setFollowModalOpen] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState('followers');
 
   const posterRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
@@ -1080,17 +1084,33 @@ export default function App() {
               {/* Stats Bar */}
               <div className="grid grid-cols-3 gap-3">
                 <div className={`p-3 rounded-lg text-center ${currentTheme.cardInner}`}>
-                  <span className="block text-xl font-bold">{userData.public_repos}</span>
+                  <span className="block text-xl font-bold">{userData.public_repos?.toLocaleString()}</span>
                   <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Repositories</span>
                 </div>
-                <div className={`p-3 rounded-lg text-center ${currentTheme.cardInner}`}>
-                  <span className="block text-xl font-bold">{userData.followers}</span>
-                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Followers</span>
-                </div>
-                <div className={`p-3 rounded-lg text-center ${currentTheme.cardInner}`}>
-                  <span className="block text-xl font-bold">{userData.following}</span>
-                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold">Following</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => { setFollowModalTab('followers'); setFollowModalOpen(true); }}
+                  className={`p-3 rounded-lg text-center ${currentTheme.cardInner} cursor-pointer hover:ring-2 hover:ring-[#0a66c2]/30 hover:shadow-sm transition-all duration-200 group`}
+                  aria-label={`View ${userData.followers?.toLocaleString()} followers`}
+                >
+                  <span className="block text-xl font-bold">{userData.followers?.toLocaleString()}</span>
+                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold flex items-center justify-center gap-1">
+                    <Users className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    Followers
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFollowModalTab('following'); setFollowModalOpen(true); }}
+                  className={`p-3 rounded-lg text-center ${currentTheme.cardInner} cursor-pointer hover:ring-2 hover:ring-[#0a66c2]/30 hover:shadow-sm transition-all duration-200 group`}
+                  aria-label={`View ${userData.following?.toLocaleString()} following`}
+                >
+                  <span className="block text-xl font-bold">{userData.following?.toLocaleString()}</span>
+                  <span className="text-[11px] opacity-70 uppercase tracking-wider font-semibold flex items-center justify-center gap-1">
+                    <Users className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    Following
+                  </span>
+                </button>
               </div>
 
               {/* Languages & Radar Section */}
@@ -1196,6 +1216,18 @@ export default function App() {
           onClose={() => setShowShareModal(false)}
           username={userData.name || userData.login}
           profileUrl={shareUrl || getPublicProfileUrl(userData.login)}
+        />
+      )}
+
+      {/* Followers / Following Modal */}
+      {userData && (
+        <FollowersFollowingModal
+          isOpen={followModalOpen}
+          onClose={() => setFollowModalOpen(false)}
+          username={userData.login}
+          followersCount={userData.followers || 0}
+          followingCount={userData.following || 0}
+          initialTab={followModalTab}
         />
       )}
 
