@@ -166,3 +166,9 @@ export const getLangColor = (lang) => {
   };
   return colors[lang] || "#6e7681";
 };
+
+export const getGithubHeaders = () => {
+  const token = import.meta.env.VITE_GITHUB_TOKEN;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+

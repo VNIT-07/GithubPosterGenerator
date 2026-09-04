@@ -24,7 +24,8 @@ import {
   FileCode,
   ExternalLink,
   Star,
-  Users
+  Users,
+  Menu
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
@@ -32,6 +33,16 @@ import ShareDialog from './src/ShareDialog.jsx';
 import LiveVisitorCounter from './src/LiveVisitorCounter.jsx';
 import FollowersFollowingModal from './src/FollowersFollowingModal.jsx';
 import { getPublicProfileUrl } from './src/profileStorage.js';
+import Sidebar from './src/Sidebar.jsx';
+import RepositoriesSection from './src/sections/RepositoriesSection.jsx';
+import FollowersFollowingSection from './src/sections/FollowersFollowingSection.jsx';
+import PinnedReposSection from './src/sections/PinnedReposSection.jsx';
+import StarredReposSection from './src/sections/StarredReposSection.jsx';
+import ContributionsSection from './src/sections/ContributionsSection.jsx';
+import ActivitySection from './src/sections/ActivitySection.jsx';
+import RightSidebar from './src/RightSidebar.jsx';
+import AchievementsModal from './src/AchievementsModal.jsx';
+import { fetchUserAchievements } from './src/achievementsService.js';
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
@@ -190,6 +201,8 @@ export default function App() {
   const [shareUrl, setShareUrl] = useState("");
   const [followModalOpen, setFollowModalOpen] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
+  const [activeSection, setActiveSection] = useState('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const posterRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
@@ -208,6 +221,35 @@ export default function App() {
   const [previewModal, setPreviewModal] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const downloadDropdownRef = useRef(null);
+  const controlsRef = useRef(null);
+  const [controlsHeight, setControlsHeight] = useState(152);
+  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  const [achievements, setAchievements] = useState([]);
+  const [achievementsLoading, setAchievementsLoading] = useState(false);
+  const [achievementsError, setAchievementsError] = useState(null);
+
+  const loadAchievements = async (userToLoad) => {
+    if (!userToLoad) {
+      setAchievements([]);
+      return;
+    }
+    setAchievementsLoading(true);
+    setAchievementsError(null);
+    try {
+      const result = await fetchUserAchievements(userToLoad);
+      if (result && result.success) {
+        setAchievements(result.achievements || []);
+      } else {
+        setAchievements([]);
+        setAchievementsError(result?.message || 'Achievements unavailable');
+      }
+    } catch (err) {
+      setAchievements([]);
+      setAchievementsError('Achievements unavailable');
+    } finally {
+      setAchievementsLoading(false);
+    }
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -236,6 +278,24 @@ export default function App() {
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Measure controls height dynamically for pixel-perfect sidebar vertical alignment
+  useEffect(() => {
+    if (!controlsRef.current) return;
+    const updateHeight = () => {
+      if (controlsRef.current) {
+        setControlsHeight(controlsRef.current.offsetHeight);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(controlsRef.current);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
     };
   }, []);
 
@@ -378,6 +438,12 @@ export default function App() {
     setLoading(true);
     setError(null);
 
+    // Clear previous user's achievements and fetch new user's real achievements
+    setAchievements([]);
+    setAchievementsLoading(true);
+    setAchievementsError(null);
+    loadAchievements(userToFetch);
+
     const token = import.meta.env.VITE_GITHUB_TOKEN;
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -453,6 +519,7 @@ export default function App() {
         ...user,
         languages,
         top_repos,
+        rawRepos: repos,
         developerScore: devScore,
 
         chartStats: [
@@ -596,6 +663,11 @@ export default function App() {
     if (!userData) return;
     setShowDownloadDropdown(false);
     setPreviewLoading(true);
+
+    if (activeSection !== 'overview' && (format === 'png' || format === 'pdf' || format === 'svg')) {
+      setActiveSection('overview');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
 
     try {
       const el = posterRef.current;
@@ -794,243 +866,319 @@ export default function App() {
 
   const currentTheme = themeStyles[theme] || themeStyles.professional;
 
+  const handleCreatePosterCTA = () => {
+    setActiveSection('overview');
+    setMobileMenuOpen(false);
+    setTimeout(() => {
+      posterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
-      {/* Controls Container */}
-      <div className="max-w-4xl mx-auto mb-8 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-        {/* Row 1: Search Bar + Generate + Download */}
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="relative flex-1" ref={inputRef}>
-            <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
-            <input
-              type="text"
-              value={inputUsername}
-              onChange={(e) => {
-                setInputUsername(e.target.value);
-                fetchSuggestions(e.target.value);
-              }}
-              onKeyDown={handleInputKeyDown}
-              onFocus={() => {
-                if (suggestions.length > 0) {
-                  setShowSuggestions(true);
-                } else if (inputUsername.trim().length >= 1) {
-                  fetchSuggestions(inputUsername);
-                }
-              }}
-              placeholder="Username or GitHub URL"
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
-              autoComplete="off"
-            />
-            {/* Suggestions Dropdown */}
-            {showSuggestions && (
-              <div
-                ref={suggestionsRef}
-                className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
-                style={{ maxHeight: '360px', overflowY: 'auto', animation: 'fadeSlideIn 0.15s ease-out' }}
-              >
-                {suggestionsLoading && suggestions.length === 0 ? (
-                  <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#0a66c2]"></div>
-                    Searching GitHub users…
-                  </div>
-                ) : suggestions.length > 0 ? (
-                  suggestions.map((user, index) => (
-                    <button
-                      key={user.id || user.login}
-                      type="button"
-                      onClick={() => handleSelectSuggestion(user.login)}
-                      onMouseEnter={() => setActiveSuggestionIndex(index)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
-                        index === activeSuggestionIndex
-                          ? 'bg-blue-50 text-[#0a66c2]'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={user.avatar_url}
-                          alt={user.login}
-                          className="w-8 h-8 rounded-full border border-gray-200"
-                          onError={(e) => {
-                            e.target.src = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
-                          }}
-                        />
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-sm font-semibold truncate">{user.login}</span>
-                        <span className="text-[11px] text-gray-400 truncate">github.com/{user.login}</span>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectSuggestion(extractUsername(inputUsername))}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-600 hover:bg-gray-50"
-                  >
-                    <span>Generate poster for <strong>{extractUsername(inputUsername)}</strong></span>
-                  </button>
-                )}
-                {suggestionsLoading && suggestions.length > 0 && (
-                  <div className="flex items-center justify-center py-2 border-t border-gray-100">
-                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-[#0a66c2]"></div>
-                  </div>
-                )}
+    <div className="min-h-screen bg-slate-100 font-sans">
+      {/* 1. Main Website Navbar (Full-Width Top Element) */}
+      <header className="w-full bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
+        <div className="w-full px-6 lg:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0a66c2]"
+              aria-label="Open sidebar menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                <Github className="w-4 h-4" />
               </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button type="submit" disabled={loading} className="h-10 whitespace-nowrap flex-1 sm:flex-none justify-center">
-              {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
-              Generate
-            </Button>
-            <div className="relative flex-1 sm:flex-none" ref={downloadDropdownRef}>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setShowDownloadDropdown((prev) => !prev)}
-                disabled={loading || !userData || isExporting}
-                className="h-10 whitespace-nowrap w-full justify-center"
-              >
-                {isExporting ? <LoadingSpinner /> : <Download className="w-4 h-4" />}
-                <span>Download</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${showDownloadDropdown ? 'rotate-180' : ''}`} />
-              </Button>
-
-              {showDownloadDropdown && (
-                <div
-                  className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 text-left"
-                  style={{ animation: 'fadeSlideIn 0.15s ease-out' }}
-                >
-                  <div className="px-3.5 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    Download Profile
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => openExportPreview('png')}
-                    disabled={isExporting}
-                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
-                  >
-                    <Image className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
-                      <div className="text-[11px] text-gray-400">Best for sharing</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openExportPreview('pdf')}
-                    disabled={isExporting}
-                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
-                  >
-                    <FileText className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
-                      <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openExportPreview('svg')}
-                    disabled={isExporting}
-                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
-                  >
-                    <Code className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
-                      <div className="text-[11px] text-gray-400">Scalable graphic</div>
-                    </div>
-                  </button>
-
-                  <div className="my-1.5 border-t border-gray-100"></div>
-
-                  <button
-                    type="button"
-                    onClick={() => openExportPreview('html')}
-                    disabled={isExporting}
-                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
-                  >
-                    <Globe className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
-                      <div className="text-[11px] text-gray-400">Standalone webpage</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openExportPreview('json')}
-                    disabled={isExporting}
-                    className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
-                  >
-                    <FileCode className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
-                      <div className="text-[11px] text-gray-400">Profile data</div>
-                    </div>
-                  </button>
-                </div>
-              )}
+              <div className="flex items-baseline gap-2">
+                <span className="font-bold text-gray-900 text-base tracking-tight">GitProfile</span>
+                <span className="hidden sm:inline-block text-xs text-gray-500 font-medium border-l border-gray-200 pl-2.5">
+                  GitHub Profile Exploration Dashboard
+                </span>
+              </div>
             </div>
           </div>
-        </form>
 
-        {/* Row 2: Share Button + Live Visitor Pill + Theme Dropdown */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleShare}
-              disabled={loading || !userData}
-              className="h-10 whitespace-nowrap text-sm"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share</span>
-            </Button>
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 text-[#0a66c2] capitalize lg:hidden">
+              {activeSection}
+            </div>
             <LiveVisitorCounter variant="compact" />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Theme:</span>
-            <select
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              className="h-10 px-3 pr-8 text-xs font-semibold capitalize bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0a66c2] focus:border-[#0a66c2] cursor-pointer appearance-none transition-all hover:bg-gray-50"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 10px center',
-              }}
+            <a
+              href="https://github.com/VNIT-07/GithubPosterGenerator"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-[#0a66c2] bg-slate-50 hover:bg-slate-100 rounded-lg border border-gray-200 transition-colors"
             >
-              {["professional", "cyberpunk", "minimal"].map((t) => (
-                <option key={t} value={t}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </option>
-              ))}
-            </select>
+              <Github className="w-3.5 h-3.5" />
+              <span>GitHub</span>
+            </a>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto flex justify-center">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center p-16 gap-3">
-            <LoadingSpinner />
-            <p className="text-gray-500 text-sm">Fetching GitHub Profile...</p>
+      {/* 2. Dashboard Layout: 3 Columns Below Navbar */}
+      <div className="w-full max-w-[1440px] 2xl:max-w-[1536px] min-[1800px]:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[285px_minmax(0,1fr)_285px] 2xl:grid-cols-[295px_minmax(0,1fr)_295px] min-[1680px]:grid-cols-[305px_minmax(0,1fr)_305px] gap-6 2xl:gap-7 items-start">
+          {/* Left Column: Sidebar on Desktop (starts 24px below navbar) */}
+          <div className="lg:col-start-1 self-start w-full">
+            <Sidebar
+              activeSection={activeSection}
+              onSelectSection={(id) => {
+                setActiveSection(id);
+                setMobileMenuOpen(false);
+              }}
+              userData={userData}
+              onCreatePoster={handleCreatePosterCTA}
+              isOpen={mobileMenuOpen}
+              onClose={() => setMobileMenuOpen(false)}
+            />
           </div>
-        ) : error ? (
-          <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 text-center max-w-md">
-            <p className="font-semibold">Failed to load profile</p>
-            <p className="text-sm mt-1">{error}</p>
+
+          {/* Right Column: Main Content Area (centered controls + poster) */}
+          <main className="w-full flex flex-col items-center min-w-0">
+            {/* Controls: Centered in main content area, max-w-2xl visually matching poster */}
+            <div ref={controlsRef} className="w-full max-w-2xl mb-6">
+              <div className="w-full bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+              {/* Row 1: Search Bar + Generate + Download */}
+              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1" ref={inputRef}>
+                  <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 z-10 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={inputUsername}
+                    onChange={(e) => {
+                      setInputUsername(e.target.value);
+                      fetchSuggestions(e.target.value);
+                    }}
+                    onKeyDown={handleInputKeyDown}
+                    onFocus={() => {
+                      if (suggestions.length > 0) {
+                        setShowSuggestions(true);
+                      } else if (inputUsername.trim().length >= 1) {
+                        fetchSuggestions(inputUsername);
+                      }
+                    }}
+                    placeholder="Username or GitHub URL"
+                    className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2] h-10"
+                    autoComplete="off"
+                  />
+                  {/* Suggestions Dropdown */}
+                  {showSuggestions && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
+                      style={{ maxHeight: '360px', overflowY: 'auto', animation: 'fadeSlideIn 0.15s ease-out' }}
+                    >
+                      {suggestionsLoading && suggestions.length === 0 ? (
+                        <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#0a66c2]"></div>
+                          Searching GitHub users…
+                        </div>
+                      ) : suggestions.length > 0 ? (
+                        suggestions.map((user, index) => (
+                          <button
+                            key={user.id || user.login}
+                            type="button"
+                            onClick={() => handleSelectSuggestion(user.login)}
+                            onMouseEnter={() => setActiveSuggestionIndex(index)}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100 ${
+                              index === activeSuggestionIndex
+                                ? 'bg-blue-50 text-[#0a66c2]'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            } ${index !== suggestions.length - 1 ? 'border-b border-gray-100' : ''}`}
+                          >
+                            <div className="relative flex-shrink-0">
+                              <img
+                                src={user.avatar_url}
+                                alt={user.login}
+                                className="w-8 h-8 rounded-full border border-gray-200"
+                                onError={(e) => {
+                                  e.target.src = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
+                                }}
+                              />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-semibold truncate">{user.login}</span>
+                              <span className="text-[11px] text-gray-400 truncate">github.com/{user.login}</span>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSuggestion(extractUsername(inputUsername))}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          <span>Generate poster for <strong>{extractUsername(inputUsername)}</strong></span>
+                        </button>
+                      )}
+                      {suggestionsLoading && suggestions.length > 0 && (
+                        <div className="flex items-center justify-center py-2 border-t border-gray-100">
+                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-[#0a66c2]"></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button type="submit" disabled={loading} className="h-10 whitespace-nowrap flex-1 sm:flex-none justify-center">
+                    {loading ? <LoadingSpinner /> : <RefreshCw className="w-4 h-4" />}
+                    Generate
+                  </Button>
+                  <div className="relative flex-1 sm:flex-none" ref={downloadDropdownRef}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowDownloadDropdown((prev) => !prev)}
+                      disabled={loading || !userData || isExporting}
+                      className="h-10 whitespace-nowrap w-full justify-center"
+                    >
+                      {isExporting ? <LoadingSpinner /> : <Download className="w-4 h-4" />}
+                      <span>Download</span>
+                      <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${showDownloadDropdown ? 'rotate-180' : ''}`} />
+                    </Button>
+
+                    {showDownloadDropdown && (
+                      <div
+                        className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 text-left"
+                        style={{ animation: 'fadeSlideIn 0.15s ease-out' }}
+                      >
+                        <div className="px-3.5 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                          Download Profile
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => openExportPreview('png')}
+                          disabled={isExporting}
+                          className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <Image className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PNG</div>
+                            <div className="text-[11px] text-gray-400">Best for sharing</div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openExportPreview('pdf')}
+                          disabled={isExporting}
+                          className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <FileText className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">PDF</div>
+                            <div className="text-[11px] text-gray-400">Best for resumes & printing</div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openExportPreview('svg')}
+                          disabled={isExporting}
+                          className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <Code className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">SVG</div>
+                            <div className="text-[11px] text-gray-400">Scalable graphic</div>
+                          </div>
+                        </button>
+
+                        <div className="my-1.5 border-t border-gray-100"></div>
+
+                        <button
+                          type="button"
+                          onClick={() => openExportPreview('html')}
+                          disabled={isExporting}
+                          className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <Globe className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">HTML</div>
+                            <div className="text-[11px] text-gray-400">Standalone webpage</div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openExportPreview('json')}
+                          disabled={isExporting}
+                          className="w-full px-3.5 py-2 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <FileCode className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-xs font-semibold text-gray-800 group-hover:text-[#0a66c2]">JSON</div>
+                            <div className="text-[11px] text-gray-400">Profile data</div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </form>
+
+              {/* Row 2: Share Button + Live Visitor Pill + Theme Dropdown */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={handleShare}
+                    disabled={loading || !userData}
+                    className="h-10 whitespace-nowrap text-sm"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>Share</span>
+                  </Button>
+                  <LiveVisitorCounter variant="compact" />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Theme:</span>
+                  <select
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value)}
+                    className="h-10 px-3 pr-8 text-xs font-semibold capitalize bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0a66c2] focus:border-[#0a66c2] cursor-pointer appearance-none transition-all hover:bg-gray-50"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 10px center',
+                    }}
+                  >
+                    {["professional", "cyberpunk", "minimal"].map((t) => (
+                      <option key={t} value={t}>
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
-        ) : userData ? (
-          <Card className={`w-full max-w-2xl ${currentTheme.bg} transition-all duration-300`} ref={posterRef}>
+
+          {/* Active Section Content */}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-16 gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <LoadingSpinner />
+                <p className="text-gray-500 text-sm">Fetching GitHub Profile...</p>
+              </div>
+            ) : error ? (
+              <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 text-center max-w-md mx-auto">
+                <p className="font-semibold">Failed to load profile</p>
+                <p className="text-sm mt-1">{error}</p>
+              </div>
+            ) : userData ? (
+              <>
+                {/* Overview Section: Preserved Profile Card */}
+                {activeSection === 'overview' && (
+                  <div className="w-full flex justify-center">
+                    <Card className={`w-full max-w-2xl ${currentTheme.bg} transition-all duration-300`} ref={posterRef}>
             {/* Header Section */}
             <div className={`p-6 ${currentTheme.headerBg}`}>
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
@@ -1185,29 +1333,154 @@ export default function App() {
                 </div>
               )}
             </div>
-          </Card>
-        ) : null}
-      </div>
+                    </Card>
+                  </div>
+                )}
 
-      {/* Footer & Live Stats */}
-      <footer className="max-w-4xl mx-auto mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-        <div className="flex items-center gap-3">
-          <LiveVisitorCounter />
+                {/* Repositories Section */}
+                {activeSection === 'repositories' && (
+                  <div className="w-full max-w-4xl">
+                    <RepositoriesSection
+                      username={userData.login}
+                      initialRepos={userData.rawRepos}
+                    />
+                  </div>
+                )}
+
+                {/* Followers Section */}
+                {activeSection === 'followers' && (
+                  <div className="w-full max-w-4xl">
+                    <FollowersFollowingSection
+                      username={userData.login}
+                      type="followers"
+                      totalCount={userData.followers}
+                    />
+                  </div>
+                )}
+
+                {/* Following Section */}
+                {activeSection === 'following' && (
+                  <div className="w-full max-w-4xl">
+                    <FollowersFollowingSection
+                      username={userData.login}
+                      type="following"
+                      totalCount={userData.following}
+                    />
+                  </div>
+                )}
+
+                {/* Pinned Repositories Section */}
+                {activeSection === 'pinned' && (
+                  <div className="w-full max-w-4xl">
+                    <PinnedReposSection
+                      username={userData.login}
+                      topRepos={userData.top_repos}
+                    />
+                  </div>
+                )}
+
+                {/* Starred Repositories Section */}
+                {activeSection === 'starred' && (
+                  <div className="w-full max-w-4xl">
+                    <StarredReposSection username={userData.login} />
+                  </div>
+                )}
+
+                {/* Contributions Section */}
+                {activeSection === 'contributions' && (
+                  <div className="w-full max-w-4xl">
+                    <ContributionsSection
+                      username={userData.login}
+                      userData={userData}
+                    />
+                  </div>
+                )}
+
+                {/* Activity Section */}
+                {activeSection === 'activity' && (
+                  <div className="w-full max-w-4xl">
+                    <ActivitySection username={userData.login} />
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {/* Footer & Live Stats */}
+            <footer className="w-full max-w-2xl mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-3">
+                <LiveVisitorCounter />
+              </div>
+              <div className="flex items-center gap-4 text-center sm:text-right">
+                <a
+                  href="https://github.com/VNIT-07/GithubPosterGenerator"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-slate-600 hover:text-[#0a66c2] transition-colors font-medium"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span>GitHub</span>
+                </a>
+                <span className="text-slate-300">•</span>
+                <span>MIT License</span>
+              </div>
+            </footer>
+          </main>
+
+          {/* Right Column: Right Sidebar on Desktop xl+ (starts 24px below navbar) */}
+          <div className="hidden xl:block xl:col-start-3 self-start w-full">
+            <RightSidebar
+              userData={userData}
+              achievements={achievements}
+              achievementsLoading={achievementsLoading}
+              achievementsError={achievementsError}
+              onViewGitHub={() => {
+                if (userData?.login) {
+                  window.open(`https://github.com/${userData.login}`, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              onCopyLink={() => {
+                const url = shareUrl || getPublicProfileUrl(userData?.login || '');
+                navigator.clipboard.writeText(url);
+                showToast('Profile link copied to clipboard!');
+              }}
+              onGeneratePoster={handleCreatePosterCTA}
+              onShare={handleShare}
+              onSelectSection={(sec) => {
+                setActiveSection(sec);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onViewAllAchievements={() => setShowAchievementsModal(true)}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-4 text-center sm:text-right">
-          <a
-            href="https://github.com/VNIT-07/GithubPosterGenerator"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-slate-600 hover:text-[#0a66c2] transition-colors font-medium"
-          >
-            <Github className="w-3.5 h-3.5" />
-            <span>GitHub</span>
-          </a>
-          <span className="text-slate-300">•</span>
-          <span>MIT License</span>
+
+        {/* Secondary Right Sidebar for Screens below xl (< 1280px) & Mobile */}
+        <div className="xl:hidden w-full max-w-2xl mx-auto mt-8">
+          <RightSidebar
+            userData={userData}
+            achievements={achievements}
+            achievementsLoading={achievementsLoading}
+            achievementsError={achievementsError}
+            onViewGitHub={() => {
+              if (userData?.login) {
+                window.open(`https://github.com/${userData.login}`, '_blank', 'noopener,noreferrer');
+              }
+            }}
+            onCopyLink={() => {
+              const url = shareUrl || getPublicProfileUrl(userData?.login || '');
+              navigator.clipboard.writeText(url);
+              showToast('Profile link copied to clipboard!');
+            }}
+            onGeneratePoster={handleCreatePosterCTA}
+            onShare={handleShare}
+            onSelectSection={(sec) => {
+              setActiveSection(sec);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onViewAllAchievements={() => setShowAchievementsModal(true)}
+          />
         </div>
-      </footer>
+      </div>
 
       {/* Share Modal */}
       {userData && (
@@ -1216,6 +1489,19 @@ export default function App() {
           onClose={() => setShowShareModal(false)}
           username={userData.name || userData.login}
           profileUrl={shareUrl || getPublicProfileUrl(userData.login)}
+        />
+      )}
+
+      {/* Achievements Modal */}
+      {userData && (
+        <AchievementsModal
+          isOpen={showAchievementsModal}
+          onClose={() => setShowAchievementsModal(false)}
+          userData={userData}
+          achievements={achievements}
+          loading={achievementsLoading}
+          error={achievementsError}
+          onRefresh={() => loadAchievements(userData.login)}
         />
       )}
 

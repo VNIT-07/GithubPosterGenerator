@@ -1,4 +1,4 @@
-import assert from 'node:assert';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 // Mock browser globals first
 const storageMap = new Map();
@@ -19,12 +19,16 @@ globalThis.fetch = async (url, opts) => {
 };
 
 let beaconSent = false;
-globalThis.navigator = {
-  sendBeacon: () => {
-    beaconSent = true;
-    return true;
+Object.defineProperty(globalThis, 'navigator', {
+  value: {
+    sendBeacon: () => {
+      beaconSent = true;
+      return true;
+    },
   },
-};
+  configurable: true,
+  writable: true,
+});
 
 import {
   generateUUID,
@@ -35,56 +39,54 @@ import {
   subscribeToVisitorCount,
 } from './visitorSession.js';
 
-async function runTests() {
-  console.log('Testing UUID generation...');
-  const uuid1 = generateUUID();
-  const uuid2 = generateUUID();
-
-  assert.strictEqual(typeof uuid1, 'string');
-  assert.strictEqual(uuid1.length, 36);
-  assert.notStrictEqual(uuid1, uuid2);
-  assert.strictEqual(isValidUUID(uuid1), true);
-  assert.strictEqual(isValidUUID(uuid2), true);
-
-  assert.strictEqual(isValidUUID(''), false);
-  assert.strictEqual(isValidUUID(null), false);
-  assert.strictEqual(isValidUUID('12345'), false);
-  console.log('✓ UUID generation and validation passed');
-
-  console.log('Testing session persistence...');
-  const sessionA = getOrCreateSessionId();
-  assert.strictEqual(isValidUUID(sessionA), true);
-  const sessionB = getOrCreateSessionId();
-  assert.strictEqual(sessionA, sessionB);
-  console.log('✓ Session persistence passed');
-
-  console.log('Testing heartbeat and subscriber...');
-  let subscriberCalled = false;
-  let receivedCount = null;
-  const unsubscribe = subscribeToVisitorCount((payload) => {
-    subscriberCalled = true;
-    receivedCount = payload.count;
+describe('visitorSession', () => {
+  beforeEach(() => {
+    storageMap.clear();
+    beaconSent = false;
   });
 
-  const res = await sendHeartbeat(sessionA);
-  assert.strictEqual(res.isLive, true);
-  assert.strictEqual(res.count, 5);
-  assert.strictEqual(subscriberCalled, true);
-  assert.strictEqual(receivedCount, 5);
-  unsubscribe();
-  console.log('✓ Heartbeat and subscriber passed');
+  it('generates and validates valid UUIDs', () => {
+    const uuid1 = generateUUID();
+    const uuid2 = generateUUID();
 
-  console.log('Testing leave beacon...');
-  sendLeaveBeacon(sessionA);
-  assert.strictEqual(beaconSent, true);
-  console.log('✓ Leave beacon passed');
+    expect(typeof uuid1).toBe('string');
+    expect(uuid1.length).toBe(36);
+    expect(uuid1).not.toBe(uuid2);
+    expect(isValidUUID(uuid1)).toBe(true);
+    expect(isValidUUID(uuid2)).toBe(true);
 
-  console.log('All visitorSession tests passed successfully!');
-}
+    expect(isValidUUID('')).toBe(false);
+    expect(isValidUUID(null)).toBe(false);
+    expect(isValidUUID('12345')).toBe(false);
+  });
 
-runTests().then(() => {
-  process.exit(0);
-}).catch((err) => {
-  console.error('Test error:', err);
-  process.exit(1);
+  it('persists session ID across calls', () => {
+    const sessionA = getOrCreateSessionId();
+    expect(isValidUUID(sessionA)).toBe(true);
+    const sessionB = getOrCreateSessionId();
+    expect(sessionA).toBe(sessionB);
+  });
+
+  it('sends heartbeat and notifies subscriber', async () => {
+    const sessionA = getOrCreateSessionId();
+    let subscriberCalled = false;
+    let receivedCount = null;
+    const unsubscribe = subscribeToVisitorCount((payload) => {
+      subscriberCalled = true;
+      receivedCount = payload.count;
+    });
+
+    const res = await sendHeartbeat(sessionA);
+    expect(res.isLive).toBe(true);
+    expect(res.count).toBe(5);
+    expect(subscriberCalled).toBe(true);
+    expect(receivedCount).toBe(5);
+    unsubscribe();
+  });
+
+  it('sends leave beacon', () => {
+    const sessionA = getOrCreateSessionId();
+    sendLeaveBeacon(sessionA);
+    expect(beaconSent).toBe(true);
+  });
 });
