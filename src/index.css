@@ -83,6 +83,19 @@
   }
 }
 
+/* ── Sidebar Backdrop Fade Animation ──────────────── */
+@keyframes sidebarBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sidebar-backdrop-in {
+  animation: sidebarBackdropIn 0.2s ease-out;
+}
+
 /* ── Hide Scrollbar Utilities ──────────────────────── */
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;

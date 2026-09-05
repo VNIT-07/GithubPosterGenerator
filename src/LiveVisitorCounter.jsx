@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, RefreshCw } from 'lucide-react';
 import {
-  getOrCreateSessionId,
-  sendHeartbeat,
-  sendLeaveBeacon,
   subscribeToVisitorCount,
+  initPresence,
+  cleanupPresence,
 } from './visitorSession.js';
-
-const HEARTBEAT_INTERVAL_MS = 8000; // 8-second dynamic polling for rapid multi-device sync
 
 /**
  * Checks if the user prefers reduced motion.
@@ -21,34 +18,54 @@ function prefersReducedMotion() {
  * LiveVisitorCounter Component
  * 
  * Production-ready real-time active visitor counter.
- * Synchronizes dynamically across all devices, browser tabs, and mobile browsers.
+ * Uses Supabase Realtime Presence for true global synchronization.
+ * All connected clients see the same count, updated instantly via WebSocket.
  */
 export default function LiveVisitorCounter({ variant = 'badge', className = '' }) {
   const [visitorCount, setVisitorCount] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isLive, setIsLive] = useState(true);
+  const [isLive, setIsLive] = useState(false);
   const [displayCount, setDisplayCount] = useState(null);
   const [isPinging, setIsPinging] = useState(false);
   const [justUpdated, setJustUpdated] = useState(false);
 
-  const timerRef = useRef(null);
-  const sessionIdRef = useRef(null);
-  const isMountedRef = useRef(true);
   const prevCountRef = useRef(null);
+  const isMountedRef = useRef(true);
 
-  // Subscribe to central session manager so all counters on page & across tabs stay in sync
+  // 1. Subscribe to presence count updates (push-based, not polling)
   useEffect(() => {
     const unsubscribe = subscribeToVisitorCount((payload) => {
+      if (!isMountedRef.current) return;
       if (typeof payload?.count === 'number') {
         setVisitorCount(payload.count);
         setIsLive(payload.isLive !== false);
         setLoading(false);
+      } else if (payload?.isLive === false) {
+        setIsLive(false);
       }
     });
     return unsubscribe;
   }, []);
 
-  // Smooth counter number transition and highlight flash on change
+  // 2. Initialize Supabase Realtime Presence channel
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    // Start presence tracking
+    const success = initPresence();
+    if (!success) {
+      // Supabase not configured — show fallback
+      setLoading(false);
+      setIsLive(false);
+    }
+
+    return () => {
+      isMountedRef.current = false;
+      cleanupPresence();
+    };
+  }, []);
+
+  // 3. Smooth counter number transition and highlight flash on change
   useEffect(() => {
     if (visitorCount === null) return;
 
@@ -91,105 +108,18 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
     };
   }, [visitorCount]);
 
-  // Main lifecycle: initial heartbeat, interval, visibility, and mobile pagehide
-  useEffect(() => {
-    isMountedRef.current = true;
-    const sessionId = getOrCreateSessionId();
-    sessionIdRef.current = sessionId;
-
-    const pingHeartbeat = async (showPingAnimation = false) => {
-      if (!isMountedRef.current) return;
-      if (showPingAnimation) setIsPinging(true);
-
-      const res = await sendHeartbeat(sessionIdRef.current);
-      if (!isMountedRef.current) return;
-
-      if (res && typeof res.count === 'number') {
-        setVisitorCount(res.count);
-        setIsLive(true);
-      } else {
-        setVisitorCount((prev) => (prev !== null ? prev : 1));
-        setIsLive(res.status !== 'error');
-      }
-      setLoading(false);
-      if (showPingAnimation) {
-        setTimeout(() => setIsPinging(false), 600);
-      }
-    };
-
-    // 1. Initial Ping
-    pingHeartbeat();
-
-    // 2. Setup periodic interval (8s)
-    const startPolling = () => {
-      stopPolling();
-      timerRef.current = setInterval(() => {
-        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-          pingHeartbeat();
-        }
-      }, HEARTBEAT_INTERVAL_MS);
-    };
-
-    const stopPolling = () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-
-    startPolling();
-
-    // 3. Page Visibility API (pause when tab hidden, resume immediately when focused)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        pingHeartbeat();
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // 4. Network Online/Offline listeners
-    const handleOnline = () => {
-      pingHeartbeat();
-      startPolling();
-    };
-    const handleOffline = () => {
-      setIsLive(false);
-      stopPolling();
-    };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // 5. Mobile & Desktop Unload / Pagehide handlers
-    const handleExit = () => {
-      sendLeaveBeacon(sessionIdRef.current);
-    };
-    window.addEventListener('pagehide', handleExit);
-    window.addEventListener('beforeunload', handleExit);
-
-    return () => {
-      isMountedRef.current = false;
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('pagehide', handleExit);
-      window.removeEventListener('beforeunload', handleExit);
-    };
-  }, []);
-
+  // Manual refresh — re-initializes presence tracking
   const handleManualRefresh = (e) => {
     e.stopPropagation();
     if (isPinging) return;
     setIsPinging(true);
-    sendHeartbeat(sessionIdRef.current).then(() => {
-      setTimeout(() => setIsPinging(false), 500);
-    });
+    // Re-init presence (safe to call multiple times)
+    initPresence();
+    setTimeout(() => setIsPinging(false), 600);
   };
 
-  const formattedCount = displayCount !== null ? displayCount : (visitorCount ?? 1);
+  const formattedCount = displayCount !== null ? displayCount : (visitorCount !== null ? visitorCount : null);
+  const showConnecting = loading || formattedCount === null;
 
   // Compact Variant (Top controls bar & mobile friendly)
   if (variant === 'compact') {
@@ -209,8 +139,8 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
           <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
         </span>
 
-        {loading ? (
-          <span className="opacity-60 text-[11px] font-mono animate-pulse">Live…</span>
+        {showConnecting ? (
+          <span className="opacity-60 text-[11px] font-mono animate-pulse">Connecting…</span>
         ) : (
           <span className="flex items-center gap-1">
             <strong className="font-bold tabular-nums text-slate-900">{formattedCount}</strong>
@@ -231,7 +161,7 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
         justUpdated ? 'ring-2 ring-emerald-400/80 bg-emerald-50/50' : ''
       } ${className}`}
       title="Real-time live visitors across all active devices. Click to refresh."
-      aria-label={`${formattedCount} active visitors online`}
+      aria-label={`${formattedCount ?? 0} active visitors online`}
       aria-live="polite"
     >
       {/* Multi-ring live pulsating indicator */}
@@ -248,7 +178,7 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
       {/* Visitor Icon & Count */}
       <div className="flex items-center gap-1.5 font-medium">
         <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        {loading ? (
+        {showConnecting ? (
           <span className="text-slate-400 font-mono text-[11px] animate-pulse">
             Connecting…
           </span>

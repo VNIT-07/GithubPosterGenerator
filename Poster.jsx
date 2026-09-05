@@ -25,7 +25,9 @@ import {
   ExternalLink,
   Star,
   Users,
-  Menu
+  Menu,
+  Lock,
+  CheckCircle2
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
@@ -40,9 +42,8 @@ import PinnedReposSection from './src/sections/PinnedReposSection.jsx';
 import StarredReposSection from './src/sections/StarredReposSection.jsx';
 import ContributionsSection from './src/sections/ContributionsSection.jsx';
 import ActivitySection from './src/sections/ActivitySection.jsx';
-import RightSidebar from './src/RightSidebar.jsx';
+import { OFFICIAL_ACHIEVEMENTS, fetchUserAchievements } from './src/achievementsService.js';
 import AchievementsModal from './src/AchievementsModal.jsx';
-import { fetchUserAchievements } from './src/achievementsService.js';
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
@@ -883,7 +884,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0a66c2]"
+              className="p-2 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0a66c2]"
               aria-label="Open sidebar menu"
             >
               <Menu className="w-5 h-5" />
@@ -919,28 +920,24 @@ export default function App() {
         </div>
       </header>
 
-      {/* 2. Dashboard Layout: 3 Columns Below Navbar */}
-      <div className="w-full max-w-[1440px] 2xl:max-w-[1536px] min-[1800px]:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[285px_minmax(0,1fr)_285px] 2xl:grid-cols-[295px_minmax(0,1fr)_295px] min-[1680px]:grid-cols-[305px_minmax(0,1fr)_305px] gap-6 2xl:gap-7 items-start">
-          {/* Left Column: Sidebar on Desktop (starts 24px below navbar) */}
-          <div className="lg:col-start-1 self-start w-full">
-            <Sidebar
-              activeSection={activeSection}
-              onSelectSection={(id) => {
-                setActiveSection(id);
-                setMobileMenuOpen(false);
-              }}
-              userData={userData}
-              onCreatePoster={handleCreatePosterCTA}
-              isOpen={mobileMenuOpen}
-              onClose={() => setMobileMenuOpen(false)}
-            />
-          </div>
+      {/* Overlay Drawer Sidebar */}
+      <Sidebar
+        activeSection={activeSection}
+        onSelectSection={(id) => {
+          setActiveSection(id);
+          setMobileMenuOpen(false);
+        }}
+        userData={userData}
+        onCreatePoster={handleCreatePosterCTA}
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
 
-          {/* Right Column: Main Content Area (centered controls + poster) */}
-          <main className="w-full flex flex-col items-center min-w-0">
+      {/* 2. Main Content — Full-Width Centered Layout */}
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+          <main className="w-full flex flex-col items-center min-w-0 mx-auto" style={{ maxWidth: '1100px' }}>
             {/* Controls: Centered in main content area, max-w-2xl visually matching poster */}
-            <div ref={controlsRef} className="w-full max-w-2xl mb-6">
+            <div ref={controlsRef} className="w-full max-w-3xl mb-6">
               <div className="w-full bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
               {/* Row 1: Search Bar + Generate + Download */}
               <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -1178,7 +1175,7 @@ export default function App() {
                 {/* Overview Section: Preserved Profile Card */}
                 {activeSection === 'overview' && (
                   <div className="w-full flex justify-center">
-                    <Card className={`w-full max-w-2xl ${currentTheme.bg} transition-all duration-300`} ref={posterRef}>
+                    <Card className={`w-full max-w-3xl ${currentTheme.bg} transition-all duration-300`} ref={posterRef}>
             {/* Header Section */}
             <div className={`p-6 ${currentTheme.headerBg}`}>
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
@@ -1402,11 +1399,152 @@ export default function App() {
                     <ActivitySection username={userData.login} />
                   </div>
                 )}
+
+                {/* Achievements Section */}
+                {activeSection === 'achievements' && (
+                  <div className="w-full max-w-4xl">
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                      {/* Section Header */}
+                      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-xl bg-blue-50 text-[#0a66c2] border border-blue-200/80 shadow-2xs">
+                            <Award className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h2 className="text-base font-bold text-gray-900">GitHub Achievements</h2>
+                            <p className="text-xs text-gray-500">
+                              {achievementsLoading
+                                ? 'Loading badges…'
+                                : `${achievements.length} earned · ${OFFICIAL_ACHIEVEMENTS.length} total badges`
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowAchievementsModal(true)}
+                          className="text-xs font-semibold text-[#0a66c2] hover:text-[#004182] hover:underline transition-colors"
+                        >
+                          View Details
+                        </button>
+                      </div>
+
+                      {/* Achievements Grid */}
+                      <div className="p-6">
+                        {achievementsLoading ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                              <div key={i} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 animate-pulse text-center">
+                                <div className="w-14 h-14 mx-auto rounded-xl bg-slate-200 mb-2" />
+                                <div className="h-3 bg-slate-200 rounded w-3/4 mx-auto mb-1.5" />
+                                <div className="h-2.5 bg-slate-100 rounded w-1/2 mx-auto" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : achievementsError && (!achievements || achievements.length === 0) ? (
+                          <div className="py-12 text-center">
+                            <Award className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                            <p className="text-sm font-semibold text-gray-700">Achievements unavailable</p>
+                            <p className="text-xs text-gray-400 mt-1">Could not load GitHub badges for this profile</p>
+                          </div>
+                        ) : (() => {
+                          const earnedSlugs = new Set((achievements || []).map((a) => a.slug.toLowerCase()));
+                          const earnedBadges = (achievements || []).map((a) => {
+                            const official = OFFICIAL_ACHIEVEMENTS.find((o) => o.slug === a.slug);
+                            return {
+                              slug: a.slug,
+                              title: a.title || official?.title || a.slug,
+                              description: a.description || official?.description || 'Verified GitHub profile achievement.',
+                              badgeUrl: a.badgeUrl || official?.badgeUrl || official?.fallbackUrl,
+                              fallbackUrl: official?.fallbackUrl,
+                              tier: a.tier || official?.tier || 'Earned',
+                              isEarned: true
+                            };
+                          });
+                          const lockedBadges = OFFICIAL_ACHIEVEMENTS
+                            .filter((o) => !earnedSlugs.has(o.slug.toLowerCase()))
+                            .map((o) => ({
+                              slug: o.slug,
+                              title: o.title,
+                              description: o.description,
+                              badgeUrl: o.badgeUrl,
+                              fallbackUrl: o.fallbackUrl,
+                              tier: o.tier || 'Locked',
+                              isEarned: false
+                            }));
+                          const allBadges = [...earnedBadges, ...lockedBadges];
+
+                          if (allBadges.length === 0) {
+                            return (
+                              <div className="py-12 text-center">
+                                <Award className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                <p className="text-sm font-semibold text-gray-700">No public achievements found</p>
+                                <p className="text-xs text-gray-400 mt-1">No badges earned on this GitHub profile</p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              {allBadges.map((badge) => (
+                                <div
+                                  key={badge.slug}
+                                  className={`p-4 rounded-xl border text-center transition-all duration-200 ${
+                                    badge.isEarned
+                                      ? 'bg-gradient-to-b from-blue-50/30 to-slate-50/60 border-blue-100/90 shadow-sm hover:shadow-md hover:border-blue-200'
+                                      : 'bg-slate-50/50 border-slate-200/60 opacity-60'
+                                  }`}
+                                >
+                                  <div className="w-14 h-14 mx-auto rounded-xl flex items-center justify-center p-1 mb-2 bg-white border border-gray-100 shadow-2xs">
+                                    <img
+                                      src={badge.badgeUrl}
+                                      alt={badge.title}
+                                      onError={(e) => {
+                                        if (badge.fallbackUrl && e.target.src !== badge.fallbackUrl) {
+                                          e.target.src = badge.fallbackUrl;
+                                        }
+                                      }}
+                                      className={`w-12 h-12 object-contain transition-transform ${
+                                        badge.isEarned ? 'scale-100 hover:scale-105' : 'grayscale opacity-60'
+                                      }`}
+                                      loading="lazy"
+                                    />
+                                  </div>
+                                  <div className="text-xs font-bold text-gray-800 truncate" title={badge.title}>
+                                    {badge.title}
+                                  </div>
+                                  {badge.description && (
+                                    <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-2 leading-snug">
+                                      {badge.description}
+                                    </p>
+                                  )}
+                                  <div className="mt-1.5">
+                                    {badge.isEarned ? (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        <span>Earned</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-slate-400">
+                                        <Lock className="w-3 h-3" />
+                                        <span>Locked</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             ) : null}
 
             {/* Footer & Live Stats */}
-            <footer className="w-full max-w-2xl mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <footer className="w-full max-w-3xl mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
               <div className="flex items-center gap-3">
                 <LiveVisitorCounter />
               </div>
@@ -1425,61 +1563,6 @@ export default function App() {
               </div>
             </footer>
           </main>
-
-          {/* Right Column: Right Sidebar on Desktop xl+ (starts 24px below navbar) */}
-          <div className="hidden xl:block xl:col-start-3 self-start w-full">
-            <RightSidebar
-              userData={userData}
-              achievements={achievements}
-              achievementsLoading={achievementsLoading}
-              achievementsError={achievementsError}
-              onViewGitHub={() => {
-                if (userData?.login) {
-                  window.open(`https://github.com/${userData.login}`, '_blank', 'noopener,noreferrer');
-                }
-              }}
-              onCopyLink={() => {
-                const url = shareUrl || getPublicProfileUrl(userData?.login || '');
-                navigator.clipboard.writeText(url);
-                showToast('Profile link copied to clipboard!');
-              }}
-              onGeneratePoster={handleCreatePosterCTA}
-              onShare={handleShare}
-              onSelectSection={(sec) => {
-                setActiveSection(sec);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onViewAllAchievements={() => setShowAchievementsModal(true)}
-            />
-          </div>
-        </div>
-
-        {/* Secondary Right Sidebar for Screens below xl (< 1280px) & Mobile */}
-        <div className="xl:hidden w-full max-w-2xl mx-auto mt-8">
-          <RightSidebar
-            userData={userData}
-            achievements={achievements}
-            achievementsLoading={achievementsLoading}
-            achievementsError={achievementsError}
-            onViewGitHub={() => {
-              if (userData?.login) {
-                window.open(`https://github.com/${userData.login}`, '_blank', 'noopener,noreferrer');
-              }
-            }}
-            onCopyLink={() => {
-              const url = shareUrl || getPublicProfileUrl(userData?.login || '');
-              navigator.clipboard.writeText(url);
-              showToast('Profile link copied to clipboard!');
-            }}
-            onGeneratePoster={handleCreatePosterCTA}
-            onShare={handleShare}
-            onSelectSection={(sec) => {
-              setActiveSection(sec);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onViewAllAchievements={() => setShowAchievementsModal(true)}
-          />
-        </div>
       </div>
 
       {/* Share Modal */}

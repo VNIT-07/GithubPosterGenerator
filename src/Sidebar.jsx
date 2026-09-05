@@ -8,6 +8,7 @@ import {
   Star,
   BarChart3,
   Activity,
+  Award,
   Sparkles,
   ArrowRight,
   RotateCw,
@@ -37,7 +38,7 @@ const DEVELOPER_QUOTES = [
     author: "Linus Torvalds"
   },
   {
-    quote: "Code is like humor. When you have to explain it, it’s bad.",
+    quote: "Code is like humor. When you have to explain it, it's bad.",
     author: "Cory House"
   }
 ];
@@ -48,12 +49,11 @@ export default function Sidebar({
   userData,
   onCreatePoster,
   isOpen = false,
-  onClose,
-  desktopStyle = {}
+  onClose
 }) {
   const [quoteIndex, setQuoteIndex] = useState(0);
 
-  // Close on Escape key (mobile drawer)
+  // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen && onClose) {
@@ -63,6 +63,18 @@ export default function Sidebar({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Prevent body scrolling when drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   const handleNextQuote = (e) => {
     e.stopPropagation();
@@ -117,6 +129,12 @@ export default function Sidebar({
       label: 'Activity',
       icon: Activity,
       badge: null
+    },
+    {
+      id: 'achievements',
+      label: 'Achievements',
+      icon: Award,
+      badge: null
     }
   ];
 
@@ -129,8 +147,8 @@ export default function Sidebar({
   const sidebarContent = (
     <div className="flex flex-col h-full justify-between gap-4 p-4">
       <div className="space-y-4">
-        {/* Mobile Header with Close Button */}
-        <div className="flex lg:hidden items-center justify-between pb-3 border-b border-gray-200">
+        {/* Header with Close Button (visible at all breakpoints) */}
+        <div className="flex items-center justify-between pb-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
               <Github className="w-4 h-4" />
@@ -248,45 +266,32 @@ export default function Sidebar({
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
-
-        {/* Sidebar Footer */}
-        <div className="pt-2 border-t border-slate-200/60 px-1 text-[11px] text-slate-600 leading-snug">
-          <div className="font-medium text-slate-500">Powered by GitHub API</div>
-          <div className="mt-0.5">Open source builds a brighter future.</div>
-        </div>
       </div>
     </div>
   );
 
+  if (!isOpen) return null;
+
   return (
-    <>
-      {/* Desktop Sticky Sidebar */}
-      <aside
-        style={desktopStyle}
-        className="hidden lg:block w-full sticky top-[76px] self-start bg-white rounded-2xl border border-gray-200 shadow-sm"
+    <div className="fixed inset-0 z-50 flex" style={{ top: '60px' }}>
+      {/* Backdrop Overlay */}
+      <div
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs sidebar-backdrop-in"
+        style={{ top: '60px' }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Drawer Panel */}
+      <div
+        className="relative bg-white h-full shadow-2xl z-10 flex flex-col overflow-y-auto no-scrollbar"
+        style={{
+          width: 'min(320px, 85vw)',
+          animation: 'drawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
       >
         {sidebarContent}
-      </aside>
-
-      {/* Mobile Off-Canvas Drawer */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-200"
-            onClick={onClose}
-            aria-hidden="true"
-          />
-
-          {/* Drawer Panel */}
-          <div
-            className="relative w-[280px] max-w-[85vw] bg-white h-full shadow-2xl z-10 flex flex-col overflow-y-auto no-scrollbar"
-            style={{ animation: 'drawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}
-          >
-            {sidebarContent}
-          </div>
-        </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
