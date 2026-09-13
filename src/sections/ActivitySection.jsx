@@ -90,14 +90,19 @@ export default function ActivitySection({ username }) {
     switch (type) {
       case 'PushEvent': {
         const commits = payload.commits || [];
+        const commitCount = payload.size !== undefined ? payload.size : (payload.distinct_size !== undefined ? payload.distinct_size : commits.length);
         const branch = (payload.ref || '').replace('refs/heads/', '');
         return {
           icon: GitCommit,
           iconColor: 'text-purple-600 bg-purple-50',
           title: (
             <span>
-              Pushed {commits.length} {commits.length === 1 ? 'commit' : 'commits'} to{' '}
-              <span className="font-semibold text-gray-800">{branch}</span>
+              {commitCount > 0 ? (
+                <>Pushed {commitCount} {commitCount === 1 ? 'commit' : 'commits'} to </>
+              ) : (
+                <>Pushed to </>
+              )}
+              <span className="font-semibold text-gray-800">{branch || 'branch'}</span>
             </span>
           ),
           repo: repoName,

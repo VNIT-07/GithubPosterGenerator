@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Github
 } from 'lucide-react';
+import FollowButton from '../FollowButton.jsx';
 import { getGithubHeaders } from '../shared.jsx';
 
 export default function FollowersFollowingSection({
@@ -223,14 +224,16 @@ export default function FollowersFollowingSection({
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {filteredUsers.map((user) => (
-              <a
+              <div
                 key={user.id || user.login}
-                href={user.html_url}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm hover:border-[#0a66c2]/40 hover:shadow-md transition-all duration-200 flex items-center justify-between group"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <a
+                  href={user.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                >
                   <img
                     src={user.avatar_url}
                     alt={user.login}
@@ -247,10 +250,25 @@ export default function FollowersFollowingSection({
                       github.com/{user.login}
                     </p>
                   </div>
-                </div>
+                </a>
 
-                <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#0a66c2] transition-colors shrink-0 ml-2" />
-              </a>
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                  <FollowButton
+                    targetUsername={user.login}
+                    showFollowsYouBadge={false}
+                    className="!min-h-[30px] !min-w-[76px] !py-1 !px-2.5 !text-[11px] !rounded-lg"
+                  />
+                  <a
+                    href={user.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 text-gray-400 hover:text-[#0a66c2] transition-colors"
+                    aria-label={`View ${user.login} on GitHub`}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
             ))}
           </div>
 

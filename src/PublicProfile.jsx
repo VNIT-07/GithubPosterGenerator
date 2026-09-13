@@ -26,6 +26,8 @@ import {
   saveProfileSnapshot,
   getPublicProfileUrl
 } from './profileStorage';
+import FollowButton from './FollowButton.jsx';
+import { isOwnProfile } from './followService.js';
 
 export default function PublicProfile({ username: propUsername }) {
   const getParams = () => {
@@ -275,54 +277,64 @@ export default function PublicProfile({ username: propUsername }) {
         <Card className={`w-full max-w-2xl ${currentTheme.bg} transition-all duration-300`}>
           {/* Header Section */}
           <div className={`p-6 ${currentTheme.headerBg}`}>
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-              <img
-                src={profileData.avatar_url}
-                alt={profileData.name || profileData.login}
-                className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md"
-                onError={(e) => {
-                  e.target.src = `https://unavatar.io/github/${profileData.login}`;
-                }}
-              />
-              <div className="flex-1 text-center sm:text-left">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  {profileData.name || profileData.login}
-                </h1>
-                <p className="text-sm opacity-80 flex items-center justify-center sm:justify-start gap-1.5 mt-0.5">
-                  <span>@{profileData.login}</span>
-                  <a
-                    href={`https://github.com/${profileData.login}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`View ${profileData.login}'s GitHub profile`}
-                    className="inline-flex items-center opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-110"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </p>
-                {profileData.bio && (
-                  <p className="text-xs mt-2 opacity-90 line-clamp-2 max-w-lg">
-                    {profileData.bio}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 flex-1 min-w-0">
+                <img
+                  src={profileData.avatar_url}
+                  alt={profileData.name || profileData.login}
+                  className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md shrink-0"
+                  onError={(e) => {
+                    e.target.src = `https://unavatar.io/github/${profileData.login}`;
+                  }}
+                />
+                <div className="flex-1 text-center sm:text-left min-w-0">
+                  <h1 className="text-2xl font-bold tracking-tight">
+                    {profileData.name || profileData.login}
+                  </h1>
+                  <p className="text-sm opacity-80 flex items-center justify-center sm:justify-start gap-1.5 mt-0.5">
+                    <span>@{profileData.login}</span>
+                    <a
+                      href={`https://github.com/${profileData.login}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`View ${profileData.login}'s GitHub profile`}
+                      className="inline-flex items-center opacity-60 hover:opacity-100 transition-all duration-200 hover:scale-110"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                   </p>
-                )}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
-                  {profileData.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {profileData.location}
-                    </span>
+                  {profileData.bio && (
+                    <p className="text-xs mt-2 opacity-90 line-clamp-2 max-w-lg">
+                      {profileData.bio}
+                    </p>
                   )}
-                  {profileData.company && (
-                    <span className="flex items-center gap-1">
-                      <Briefcase className="w-3 h-3" /> {profileData.company}
-                    </span>
-                  )}
-                  {profileData.created_at && (
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" /> Joined {new Date(profileData.created_at).getFullYear()}
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3 text-xs opacity-75">
+                    {profileData.location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {profileData.location}
+                      </span>
+                    )}
+                    {profileData.company && (
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="w-3 h-3" /> {profileData.company}
+                      </span>
+                    )}
+                    {profileData.created_at && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Joined {new Date(profileData.created_at).getFullYear()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {!isOwnProfile(profileData.login) && (
+                <div className="shrink-0 flex items-center justify-center sm:justify-end sm:pt-1">
+                  <FollowButton
+                    targetUsername={profileData.login}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

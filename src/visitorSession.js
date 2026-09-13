@@ -1,34 +1,41 @@
 /**
  * Visitor Presence Manager — Supabase Realtime Presence
  *
- * Provides TRUE GLOBAL REAL-TIME presence synchronization.
- * All connected clients share a single Supabase Realtime Presence channel.
- * When any client joins or leaves, every other connected client is notified
- * instantly via WebSocket push — no polling required.
- *
- * React Strict Mode safe: handles mount → unmount → remount without duplicates.
+ * Provides globally synchronized real-time presence across all GitProfile visitors.
+ * All connected clients share a single Supabase Realtime Presence channel ("gitprofile-online-users").
+ * Each browser session maintains its own unique presence key.
+ * 
+ * Multi-component & React Strict Mode Safe:
+ * Uses reference counting so multiple LiveVisitorCounter instances on the same page
+ * and StrictMode mount/unmount cycles do not destroy the shared channel prematurely.
  */
 
-import { supabase } from './supabaseClient.js';
+import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 
-// ── Subscriber system (unchanged API surface) ──────────────────────────────
+// ── Subscriber system ──────────────────────────────────────────────────────
 const countListeners = new Set();
 let currentKnownCount = null;
+let currentStatus = 'connecting'; // 'connecting' | 'connected' | 'unavailable' | 'error'
 let currentIsLive = false;
+let currentError = null;
 
 /**
  * Subscribe to visitor count updates.
- * Callback receives { count: number, isLive: boolean }.
+ * Callback receives { count: number | null, status: string, isLive: boolean, error?: string }.
  * Returns an unsubscribe function.
  */
 export function subscribeToVisitorCount(callback) {
   countListeners.add(callback);
-  // Immediately emit current known state if we have one
-  if (currentKnownCount !== null) {
-    try {
-      callback({ count: currentKnownCount, isLive: currentIsLive });
-    } catch { /* ignore */ }
-  }
+  // Immediately emit current known state if initialized
+  try {
+    callback({
+      count: currentKnownCount,
+      status: currentStatus,
+      isLive: currentIsLive,
+      error: currentError,
+    });
+  } catch { /* ignore */ }
+
   return () => {
     countListeners.delete(callback);
   };
@@ -37,11 +44,26 @@ export function subscribeToVisitorCount(callback) {
 function notifyCountListeners(payload) {
   if (typeof payload?.count === 'number') {
     currentKnownCount = payload.count;
-    currentIsLive = payload.isLive !== false;
   }
+  if (payload?.status) {
+    currentStatus = payload.status;
+  }
+  if (typeof payload?.isLive === 'boolean') {
+    currentIsLive = payload.isLive;
+  }
+  currentError = payload?.error || null;
+
+  const data = {
+    count: currentKnownCount,
+    status: currentStatus,
+    isLive: currentIsLive,
+    error: currentError,
+    ...payload,
+  };
+
   countListeners.forEach((listener) => {
     try {
-      listener(payload);
+      listener(data);
     } catch (e) {
       console.warn('[Presence] Listener error:', e);
     }
@@ -52,113 +74,168 @@ function notifyCountListeners(payload) {
 
 const CHANNEL_NAME = 'gitprofile-online-users';
 let activeChannel = null;
-let connectionId = null;   // unique per connection/tab
-let initCount = 0;         // guards against React Strict Mode double-mount
+let connectionId = null;
+let activeSubscribersCount = 0;
+let channelSubscriptionStatus = 'DISCONNECTED';
 
 /**
- * Generate a unique connection ID for this tab/session.
- * NOT persisted — each page load / tab gets a fresh ID.
+ * Generate or get a unique connection ID for this browser session.
  */
-function generateConnectionId() {
+function getOrCreateConnectionId() {
+  if (connectionId) return connectionId;
+  try {
+    const stored = sessionStorage.getItem('gitprofile_presence_connection_id');
+    if (stored) {
+      connectionId = stored;
+      return connectionId;
+    }
+  } catch { /* ignore */ }
+
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+    connectionId = crypto.randomUUID();
+  } else {
+    connectionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   }
-  // Fallback
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+
+  try {
+    sessionStorage.setItem('gitprofile_presence_connection_id', connectionId);
+  } catch { /* ignore */ }
+
+  return connectionId;
 }
 
 /**
- * Calculate total active connections from presence state.
+ * Calculate total active unique connections from presence state.
  */
-function countPresences(channel) {
-  const state = channel.presenceState();
-  let total = 0;
-  for (const key of Object.keys(state)) {
-    total += state[key].length;
+function calculatePresences(channel) {
+  if (!channel) return 1;
+  try {
+    const state = channel.presenceState();
+    if (!state || typeof state !== 'object') return 1;
+    const keys = Object.keys(state);
+    let count = 0;
+    for (const key of keys) {
+      const list = state[key];
+      if (Array.isArray(list) && list.length > 0) {
+        count++;
+      }
+    }
+    return Math.max(1, count);
+  } catch (err) {
+    console.warn('[Presence] Error reading presence state:', err);
+    return 1;
   }
-  return Math.max(0, total);
 }
 
 /**
  * Initialize the Supabase Realtime Presence channel.
- * Safe to call multiple times — only one channel is active at a time.
- * Returns true if initialization succeeded, false otherwise.
+ * Uses reference counting so multiple component mounts don't create duplicate channels.
  */
 export function initPresence() {
-  // Guard: Supabase not configured
-  if (!supabase) {
-    notifyCountListeners({ count: null, isLive: false, error: 'Supabase not configured' });
+  activeSubscribersCount++;
+
+  // Guard: Supabase credentials not configured
+  if (!isSupabaseConfigured || !supabase) {
+    notifyCountListeners({
+      count: null,
+      status: 'unavailable',
+      isLive: false,
+      error: 'Supabase credentials not configured',
+    });
     return false;
   }
 
-  // If we already have an active channel, just re-track
-  if (activeChannel && connectionId) {
-    activeChannel.track({
-      connection_id: connectionId,
-      online_at: new Date().toISOString(),
-    }).catch(() => { /* ignore re-track errors */ });
+  // Already have an active connected or connecting channel
+  if (activeChannel) {
+    if (channelSubscriptionStatus === 'SUBSCRIBED') {
+      const count = calculatePresences(activeChannel);
+      notifyCountListeners({ count, status: 'connected', isLive: true });
+    } else {
+      notifyCountListeners({ count: currentKnownCount, status: 'connecting', isLive: false });
+    }
     return true;
   }
 
-  initCount++;
-  const currentInit = initCount;
-  connectionId = generateConnectionId();
+  const connId = getOrCreateConnectionId();
+  notifyCountListeners({ count: currentKnownCount, status: 'connecting', isLive: false });
 
-  const channel = supabase.channel(CHANNEL_NAME, {
-    config: {
-      presence: {
-        key: connectionId,
+  try {
+    const channel = supabase.channel(CHANNEL_NAME, {
+      config: {
+        presence: {
+          key: connId,
+        },
       },
-    },
-  });
-
-  channel
-    .on('presence', { event: 'sync' }, () => {
-      // Fired whenever the full presence state changes (join, leave, or periodic sync)
-      if (currentInit !== initCount) return; // stale mount guard
-      const count = countPresences(channel);
-      notifyCountListeners({ count, isLive: true });
-    })
-    .on('presence', { event: 'join' }, () => {
-      // Also recount on explicit join for fastest UI update
-      if (currentInit !== initCount) return;
-      const count = countPresences(channel);
-      notifyCountListeners({ count, isLive: true });
-    })
-    .on('presence', { event: 'leave' }, () => {
-      // Also recount on explicit leave
-      if (currentInit !== initCount) return;
-      const count = countPresences(channel);
-      notifyCountListeners({ count, isLive: true });
-    })
-    .subscribe(async (status) => {
-      if (currentInit !== initCount) return; // stale mount guard
-
-      if (status === 'SUBSCRIBED') {
-        // Track our presence
-        await channel.track({
-          connection_id: connectionId,
-          online_at: new Date().toISOString(),
-        });
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        notifyCountListeners({ count: currentKnownCount, isLive: false, error: status });
-      }
     });
 
-  activeChannel = channel;
-  return true;
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const count = calculatePresences(channel);
+        notifyCountListeners({ count, status: 'connected', isLive: true });
+      })
+      .on('presence', { event: 'join' }, () => {
+        const count = calculatePresences(channel);
+        notifyCountListeners({ count, status: 'connected', isLive: true });
+      })
+      .on('presence', { event: 'leave' }, () => {
+        const count = calculatePresences(channel);
+        notifyCountListeners({ count, status: 'connected', isLive: true });
+      })
+      .subscribe(async (status, err) => {
+        channelSubscriptionStatus = status;
+
+        if (status === 'SUBSCRIBED') {
+          try {
+            await channel.track({
+              connection_id: connId,
+              online_at: new Date().toISOString(),
+              user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+            });
+            const count = calculatePresences(channel);
+            notifyCountListeners({ count, status: 'connected', isLive: true });
+          } catch (trackErr) {
+            console.warn('[Presence] Failed to track presence:', trackErr);
+            notifyCountListeners({ count: 1, status: 'connected', isLive: true });
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn(`[Presence] Channel status: ${status}`, err);
+          notifyCountListeners({
+            count: null,
+            status: 'error',
+            isLive: false,
+            error: err?.message || status,
+          });
+        }
+      });
+
+    activeChannel = channel;
+    return true;
+  } catch (err) {
+    console.error('[Presence] Error initializing channel:', err);
+    notifyCountListeners({
+      count: null,
+      status: 'error',
+      isLive: false,
+      error: err.message,
+    });
+    return false;
+  }
 }
 
 /**
  * Clean up the presence channel.
- * Call on component unmount or page unload.
+ * Only tears down the real WebSocket connection when all component subscribers have unmounted.
  */
 export function cleanupPresence() {
-  initCount++; // invalidate any pending callbacks from previous init
+  activeSubscribersCount = Math.max(0, activeSubscribersCount - 1);
+
+  if (activeSubscribersCount > 0) {
+    return; // Other components are still using the channel
+  }
 
   if (activeChannel) {
     try {
@@ -170,45 +247,28 @@ export function cleanupPresence() {
     } catch { /* ignore */ }
 
     activeChannel = null;
+    channelSubscriptionStatus = 'DISCONNECTED';
   }
-
-  connectionId = null;
 }
 
-// ── Legacy exports (kept for backward compat but no longer used) ───────────
-
-/**
- * @deprecated No longer used — presence is managed via Supabase Realtime.
- */
+// ── Legacy exports (kept for backward compatibility) ───────────────────────
 export function generateUUID() {
-  return generateConnectionId();
+  return getOrCreateConnectionId();
 }
 
-/**
- * @deprecated No longer used — presence is managed via Supabase Realtime.
- */
 export function isValidUUID(uuid) {
   if (typeof uuid !== 'string') return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid.trim());
 }
 
-/**
- * @deprecated Kept for backward compatibility. Returns a UUID but is not used by presence.
- */
 export function getOrCreateSessionId() {
-  return generateConnectionId();
+  return getOrCreateConnectionId();
 }
 
-/**
- * @deprecated No-op. Heartbeat is replaced by Supabase Presence tracking.
- */
 export async function sendHeartbeat() {
-  return { count: currentKnownCount, status: 'noop', isLive: currentIsLive };
+  return { count: currentKnownCount, status: currentStatus, isLive: currentIsLive };
 }
 
-/**
- * @deprecated No-op. Leave is handled by Supabase connection lifecycle.
- */
 export function sendLeaveBeacon() {
-  // Supabase Realtime handles disconnect automatically
+  // Disconnect lifecycle handled by Supabase Realtime
 }

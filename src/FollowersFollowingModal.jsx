@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Users, UserPlus, ExternalLink, AlertCircle, ChevronDown } from 'lucide-react';
+import FollowButton from './FollowButton.jsx';
 
 /**
  * Parse GitHub's Link header to extract the "next" page URL.
@@ -384,16 +385,23 @@ export default function FollowersFollowingModal({
                     <p className="text-sm font-semibold text-gray-800 truncate">{user.login}</p>
                     <p className="text-[11px] text-gray-400 truncate">github.com/{user.login}</p>
                   </div>
-                  <a
-                    href={user.html_url || `https://github.com/${user.login}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-[#0a66c2] hover:bg-blue-50 rounded-lg transition-all shrink-0 opacity-70 group-hover:opacity-100"
-                    aria-label={`View ${user.login}'s GitHub profile`}
-                  >
-                    <span className="hidden sm:inline">View</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <FollowButton
+                      targetUsername={user.login}
+                      showFollowsYouBadge={false}
+                      className="!min-h-[28px] !min-w-[72px] !py-1 !px-2.5 !text-[11px] !rounded-lg"
+                    />
+                    <a
+                      href={user.html_url || `https://github.com/${user.login}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-[#0a66c2] hover:bg-blue-50 rounded-lg transition-all shrink-0 opacity-70 group-hover:opacity-100"
+                      aria-label={`View ${user.login}'s GitHub profile`}
+                    >
+                      <span className="hidden sm:inline">View</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
                 </div>
               ))}
 
