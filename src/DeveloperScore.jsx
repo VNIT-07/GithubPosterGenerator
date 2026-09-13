@@ -219,9 +219,9 @@ function BreakdownBar({ label, score, color, theme, delay = 0 }) {
  *   currentTheme — themeStyles[theme] object
  */
 export default function DeveloperScore({ scoreData, theme, currentTheme }) {
-  if (!scoreData) return null;
+  if (!scoreData || !scoreData.breakdown) return null;
 
-  const { overall, breakdown, label } = scoreData;
+  const { overall = 0, breakdown = {}, label = '' } = scoreData;
 
   const labelColor =
     theme === 'cyberpunk'

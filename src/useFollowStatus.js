@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  getFollowStatus,
+  isUserFollowed,
+  isOwnProfile as checkIsOwnProfile,
   toggleFollow as serviceToggleFollow,
   subscribeToFollowChanges,
-  isOwnProfile as checkIsOwnProfile,
+  extractTargetInfo,
+  initAuthoritativeFollows
 } from './followService.js';
 
 /**
  * Reusable Custom Hook: useFollowStatus
  * 
- * Provides unified follow state across the entire application:
+ * Provides unified, authoritative follow state across the entire application:
  * - Profile header
  * - Shared profiles
  * - Followers / Following lists
@@ -17,106 +19,77 @@ import {
  * 
  * Strictly adheres to directional semantics:
  * - isFollowing: Does CURRENT_USER follow TARGET_USER?
- * - followsYou: Does TARGET_USER follow CURRENT_USER?
  * - isOwnProfile: Is TARGET_USER the CURRENT_USER? (Renders NO button)
  */
-export function useFollowStatus(targetUsername) {
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followsYou, setFollowsYou] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+export function useFollowStatus(target) {
+  const { targetId, targetUsername } = extractTargetInfo(target);
+  const isOwn = checkIsOwnProfile(target);
+
+  const [isFollowing, setIsFollowing] = useState(() => isUserFollowed(target));
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const isOwn = checkIsOwnProfile(targetUsername);
-
-  // Sync state whenever targetUsername changes
+  // Sync state when target changes or when authoritative store changes
   useEffect(() => {
-    if (isOwn || !targetUsername) {
+    if (isOwn || (!targetId && !targetUsername)) {
       setIsFollowing(false);
-      setFollowsYou(false);
-      setIsLoading(false);
       return;
     }
 
-    let isMounted = true;
-    setIsLoading(true);
-    setError(null);
+    // Read current synchronous state from authoritative store
+    setIsFollowing(isUserFollowed(target));
 
-    getFollowStatus(targetUsername)
-      .then((status) => {
-        if (!isMounted) return;
-        setIsFollowing(Boolean(status.isFollowing));
-        setFollowsYou(Boolean(status.followsYou));
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        setIsLoading(false);
-        setError(err.message || 'Failed to check follow status');
-      });
+    // Ensure authoritative follows graph is fully initialized
+    initAuthoritativeFollows().then(() => {
+      setIsFollowing(isUserFollowed(target));
+    }).catch(() => {});
 
-    // Real-time synchronization
-    const unsubscribe = subscribeToFollowChanges(({ target, isFollowing: nextFollow, followsYou: nextFollowsYou }) => {
-      if (!isMounted) return;
-      if (target && target.toLowerCase() === (targetUsername || '').toLowerCase()) {
-        setIsFollowing(Boolean(nextFollow));
-        if (typeof nextFollowsYou === 'boolean') {
-          setFollowsYou(nextFollowsYou);
-        }
+    // Subscribe to real-time follow changes
+    const unsubscribe = subscribeToFollowChanges((change) => {
+      if (!change || (!change.targetId && !change.targetUsername)) {
+        // Global sync event
+        setIsFollowing(isUserFollowed(target));
+        return;
+      }
+
+      const matchId = targetId && change.targetId && Number(targetId) === Number(change.targetId);
+      const matchUser = targetUsername && change.targetUsername && targetUsername.toLowerCase() === change.targetUsername.toLowerCase();
+
+      if (matchId || matchUser) {
+        setIsFollowing(Boolean(change.isFollowing));
       }
     });
 
     return () => {
-      isMounted = false;
       unsubscribe();
     };
-  }, [targetUsername, isOwn]);
+  }, [targetId, targetUsername, isOwn]);
 
   const toggle = useCallback(async () => {
-    if (isOwn || isLoading || actionLoading) return;
+    if (isOwn || actionLoading) return;
 
     setActionLoading(true);
     setError(null);
 
-    const previousState = isFollowing;
-    // Optimistic toggle
-    setIsFollowing(!previousState);
-
+    const prev = isFollowing;
     try {
-      const res = await serviceToggleFollow(targetUsername, previousState);
+      const res = await serviceToggleFollow(target, prev);
       setIsFollowing(Boolean(res.isFollowing));
-      if (typeof res.followsYou === 'boolean') {
-        setFollowsYou(res.followsYou);
-      }
     } catch (err) {
-      // Revert on error
-      setIsFollowing(previousState);
+      setIsFollowing(prev);
       setError(err.message || 'Follow request failed');
       setTimeout(() => setError(null), 3500);
     } finally {
       setActionLoading(false);
     }
-  }, [targetUsername, isOwn, isLoading, actionLoading, isFollowing]);
-
-  const follow = useCallback(async () => {
-    if (isOwn || isLoading || actionLoading || isFollowing) return;
-    return toggle();
-  }, [isOwn, isLoading, actionLoading, isFollowing, toggle]);
-
-  const unfollow = useCallback(async () => {
-    if (isOwn || isLoading || actionLoading || !isFollowing) return;
-    return toggle();
-  }, [isOwn, isLoading, actionLoading, isFollowing, toggle]);
+  }, [target, isOwn, actionLoading, isFollowing]);
 
   return {
     isOwnProfile: isOwn,
     isFollowing,
-    followsYou,
-    isLoading,
+    isLoading: false,
     actionLoading,
     error,
-    follow,
-    unfollow,
     toggleFollow: toggle,
   };
 }

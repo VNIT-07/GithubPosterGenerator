@@ -113,6 +113,24 @@ export default function FollowersFollowingModal({
         });
 
         if (!res.ok) {
+          if (res.status === 403) {
+            try {
+              const raw = sessionStorage.getItem(`gitprofile_ff_${username}_${type}`);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.users && parsed.users.length > 0) {
+                  setData((prev) => ({
+                    ...prev,
+                    [type]: parsed.users,
+                  }));
+                  setFetched((prev) => ({ ...prev, [type]: true }));
+                  setLoading((prev) => ({ ...prev, [type]: false }));
+                  setLoadingMore((prev) => ({ ...prev, [type]: false }));
+                  return;
+                }
+              }
+            } catch (e) {}
+          }
           let msg = 'Unable to load data. Please try again.';
           if (res.status === 404) msg = 'User not found.';
           else if (res.status === 403) msg = 'GitHub API rate limit exceeded. Please wait or set a VITE_GITHUB_TOKEN.';
@@ -124,14 +142,31 @@ export default function FollowersFollowingModal({
         const linkHeader = res.headers.get('Link');
         const next = parseNextLink(linkHeader);
 
-        setData((prev) => ({
-          ...prev,
-          [type]: append ? [...prev[type], ...users] : users,
-        }));
+        setData((prev) => {
+          const updated = append ? [...prev[type], ...users] : users;
+          try {
+            sessionStorage.setItem(`gitprofile_ff_${username}_${type}`, JSON.stringify({ users: updated }));
+          } catch (e) {}
+          return {
+            ...prev,
+            [type]: updated,
+          };
+        });
         setNextUrl((prev) => ({ ...prev, [type]: next }));
         setFetched((prev) => ({ ...prev, [type]: true }));
       } catch (err) {
         if (err.name === 'AbortError') return;
+        try {
+          const raw = sessionStorage.getItem(`gitprofile_ff_${username}_${type}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.users && parsed.users.length > 0) {
+              setData((prev) => ({ ...prev, [type]: parsed.users }));
+              setFetched((prev) => ({ ...prev, [type]: true }));
+              return;
+            }
+          }
+        } catch (e) {}
         setError((prev) => ({
           ...prev,
           [type]: err.message || 'Unable to load data. Please try again.',
@@ -387,7 +422,9 @@ export default function FollowersFollowingModal({
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <FollowButton
+                      targetUser={user}
                       targetUsername={user.login}
+                      targetUserId={user.id}
                       showFollowsYouBadge={false}
                       className="!min-h-[28px] !min-w-[72px] !py-1 !px-2.5 !text-[11px] !rounded-lg"
                     />

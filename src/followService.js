@@ -1,79 +1,110 @@
 /**
- * Follow Service — Real-time Directional Follow Management
+ * Follow Service — Authoritative Real-time Follow State Management
  * 
- * Answers two distinct directional queries:
- * 1. isFollowing: Does CURRENT_USER follow TARGET_USER?
- * 2. followsYou: Does TARGET_USER follow CURRENT_USER?
- * 
- * Rules:
- * - isFollowing controls whether [ + Follow ] or [ ✓ Following ] is rendered
- * - followsYou NEVER causes the button to show "Following"
- * - isOwnProfile strictly prevents rendering any Follow button on self
- * - Directional relationship: follower_id = CURRENT_USER, following_id = TARGET_USER
+ * Core Principles:
+ * - State is based on the ACTUAL relationship between currentUser.id and targetUser.id
+ * - Single source of truth for the entire application (Profile, Following, Followers, Search, Modals)
+ * - Directional relationship: follower_id = currentUser.id, following_id = targetUser.id
+ * - "Following me" and "I am following them" are strictly separated
+ * - Self-profile strictly returns isOwnProfile: true, isFollowing: false (no button rendered)
  */
 
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 
 const AUTH_USER_KEY = 'gitprofile_authenticated_user';
-const FOLLOWS_CACHE_KEY = 'gitprofile_directional_follows_cache';
+const FOLLOWING_IDS_KEY = 'gitprofile_following_user_ids';
+const FOLLOWING_USERNAMES_KEY = 'gitprofile_following_usernames';
 
 export const DEFAULT_AUTHENTICATED_USER = {
-  id: 'usr_vnit07',
+  id: 175917534,
   githubUsername: 'VNIT-07',
+  login: 'VNIT-07',
 };
 
-/**
- * Get the currently authenticated user's profile identity.
- */
+// ── In-Memory Authoritative Store (Singleton) ──────────────────────────────
+const followingIdsSet = new Set();
+const followingUsernamesSet = new Set();
+let isInitialized = false;
+let initPromise = null;
+
 export function getAuthenticatedUser() {
   try {
     const saved = localStorage.getItem(AUTH_USER_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && parsed.githubUsername) {
-        return parsed;
+        return {
+          id: Number(parsed.id) || (parsed.githubUsername.toLowerCase() === 'vnit-07' ? 175917534 : parsed.id),
+          githubUsername: parsed.githubUsername,
+          login: parsed.githubUsername,
+        };
       }
     }
   } catch { /* ignore */ }
   return DEFAULT_AUTHENTICATED_USER;
 }
 
-/**
- * Set the currently authenticated user's profile identity.
- */
 export function setAuthenticatedUser(user) {
   if (!user || !user.githubUsername) return;
   try {
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-    notifyFollowListeners();
+    const userToSave = {
+      id: Number(user.id) || (user.githubUsername.toLowerCase() === 'vnit-07' ? 175917534 : user.id),
+      githubUsername: user.githubUsername,
+      login: user.githubUsername,
+    };
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userToSave));
+    initAuthoritativeFollows(true);
   } catch { /* ignore */ }
 }
 
 /**
- * Check if the given GitHub username belongs to the currently authenticated user.
- * Universal helper used across the entire site.
+ * Check if target is the authenticated user's own profile.
  */
-export function isOwnProfile(targetUsername) {
-  if (!targetUsername || typeof targetUsername !== 'string') return false;
+export function isOwnProfile(target) {
+  if (!target) return false;
   const current = getAuthenticatedUser();
-  return targetUsername.trim().toLowerCase() === current.githubUsername.trim().toLowerCase();
-}
+  const currentNorm = (current.githubUsername || '').trim().toLowerCase();
+  const currentId = Number(current.id);
 
-function getLocalCache() {
-  try {
-    const raw = localStorage.getItem(FOLLOWS_CACHE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
+  if (typeof target === 'object') {
+    if (target.id && Number(target.id) === currentId) return true;
+    const tLogin = (target.login || target.username || '').trim().toLowerCase();
+    if (tLogin && tLogin === currentNorm) return true;
+  } else if (typeof target === 'number') {
+    return target === currentId;
+  } else if (typeof target === 'string') {
+    const trimmed = target.trim().toLowerCase();
+    const num = Number(trimmed);
+    if (!isNaN(num) && num === currentId) return true;
+    return trimmed === currentNorm;
   }
+  return false;
 }
 
-function saveLocalCache(cache) {
-  try {
-    localStorage.setItem(FOLLOWS_CACHE_KEY, JSON.stringify(cache));
-  } catch { /* ignore */ }
+// ── Extract standard user identity helpers ─────────────────────────────────
+export function extractTargetInfo(target) {
+  if (!target) return { targetId: null, targetUsername: '' };
+
+  if (typeof target === 'object') {
+    const targetId = Number(target.id) || (typeof target.id === 'string' ? target.id : null);
+    const targetUsername = (target.login || target.username || '').trim().toLowerCase();
+    return { targetId, targetUsername };
+  }
+  if (typeof target === 'number') {
+    return { targetId: target, targetUsername: '' };
+  }
+  if (typeof target === 'string') {
+    const trimmed = target.trim().toLowerCase();
+    const num = Number(trimmed);
+    if (!isNaN(num) && num > 0) {
+      return { targetId: num, targetUsername: '' };
+    }
+    return { targetId: null, targetUsername: trimmed };
+  }
+  return { targetId: null, targetUsername: '' };
 }
 
+// ── Listener Subscription System ───────────────────────────────────────────
 const followListeners = new Set();
 
 export function subscribeToFollowChanges(callback) {
@@ -81,200 +112,253 @@ export function subscribeToFollowChanges(callback) {
   return () => followListeners.delete(callback);
 }
 
-function notifyFollowListeners(target, isFollowing, followsYou) {
-  const norm = (target || '').toLowerCase().trim();
+function notifyFollowListeners(target, isFollowing) {
+  const { targetId, targetUsername } = extractTargetInfo(target);
   followListeners.forEach((cb) => {
     try {
-      cb({ target: norm, isFollowing, followsYou });
+      cb({ targetId, targetUsername, isFollowing });
     } catch { /* ignore */ }
   });
 }
 
-// ── Cross-tab Real-time Broadcast Channel ──────────────────────────────────
+// ── LocalStorage Helpers ───────────────────────────────────────────────────
+function loadFromStorage() {
+  try {
+    const rawIds = localStorage.getItem(FOLLOWING_IDS_KEY);
+    if (rawIds) {
+      const arr = JSON.parse(rawIds);
+      if (Array.isArray(arr)) {
+        arr.forEach((id) => followingIdsSet.add(Number(id)));
+      }
+    }
+    const rawUsernames = localStorage.getItem(FOLLOWING_USERNAMES_KEY);
+    if (rawUsernames) {
+      const arr = JSON.parse(rawUsernames);
+      if (Array.isArray(arr)) {
+        arr.forEach((u) => followingUsernamesSet.add(String(u).trim().toLowerCase()));
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(FOLLOWING_IDS_KEY, JSON.stringify(Array.from(followingIdsSet)));
+    localStorage.setItem(FOLLOWING_USERNAMES_KEY, JSON.stringify(Array.from(followingUsernamesSet)));
+  } catch { /* ignore */ }
+}
+
+// ── Cross-tab Broadcast Channel ────────────────────────────────────────────
 let broadcastChannel = null;
 try {
   if (typeof BroadcastChannel !== 'undefined') {
     broadcastChannel = new BroadcastChannel('gitprofile_follow_directional_realtime');
     broadcastChannel.onmessage = (event) => {
       const data = event.data;
-      if (data && data.target) {
-        const cache = getLocalCache();
-        const current = getAuthenticatedUser();
-        const currentNorm = current.githubUsername.toLowerCase();
-        
-        // Update directional entry: CURRENT -> TARGET
-        cache[`${currentNorm}->${data.target}`] = {
-          isFollowing: data.isFollowing,
-          followsYou: data.followsYou || false,
-        };
-        saveLocalCache(cache);
-
-        notifyFollowListeners(data.target, data.isFollowing, data.followsYou);
+      if (data) {
+        if (data.action === 'sync') {
+          if (Array.isArray(data.followingIds)) {
+            data.followingIds.forEach((id) => followingIdsSet.add(Number(id)));
+          }
+          if (Array.isArray(data.followingUsernames)) {
+            data.followingUsernames.forEach((u) => followingUsernamesSet.add(String(u).toLowerCase()));
+          }
+          saveToStorage();
+          notifyFollowListeners(null, null);
+        } else if (data.targetId || data.targetUsername) {
+          if (data.isFollowing) {
+            if (data.targetId) followingIdsSet.add(Number(data.targetId));
+            if (data.targetUsername) followingUsernamesSet.add(data.targetUsername.toLowerCase());
+          } else {
+            if (data.targetId) followingIdsSet.delete(Number(data.targetId));
+            if (data.targetUsername) followingUsernamesSet.delete(data.targetUsername.toLowerCase());
+          }
+          saveToStorage();
+          notifyFollowListeners(data, data.isFollowing);
+        }
       }
     };
   }
 } catch { /* ignore */ }
 
-// Storage listener fallback
+// Load storage cache immediately on module evaluation
+loadFromStorage();
+
+/**
+ * Initialize Authoritative Follows graph from backend and GitHub.
+ */
+export async function initAuthoritativeFollows(force = false) {
+  if (isInitialized && !force) return;
+  if (initPromise && !force) return initPromise;
+
+  initPromise = (async () => {
+    const current = getAuthenticatedUser();
+    const currentNorm = current.githubUsername.toLowerCase().trim();
+
+    try {
+      // 1. Fetch from local backend API /api/follows?list=true
+      const apiRes = await fetch(
+        `/api/follows?list=true&currentUser=${encodeURIComponent(currentNorm)}&currentUserId=${current.id}`
+      );
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        if (Array.isArray(data.followingIds)) {
+          data.followingIds.forEach((id) => followingIdsSet.add(Number(id)));
+        }
+        if (Array.isArray(data.followingUsernames)) {
+          data.followingUsernames.forEach((u) => followingUsernamesSet.add(String(u).toLowerCase()));
+        }
+      }
+    } catch { /* fallback to GitHub API directly */ }
+
+    try {
+      // 2. Direct GitHub following list to ensure 100% authoritative sync
+      const token = import.meta.env.VITE_GITHUB_TOKEN;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const ghRes = await fetch(
+        `https://api.github.com/users/${encodeURIComponent(current.githubUsername)}/following?per_page=100`,
+        { headers }
+      );
+      if (ghRes.ok) {
+        const ghUsers = await ghRes.json();
+        if (Array.isArray(ghUsers)) {
+          ghUsers.forEach((u) => {
+            if (u.id) followingIdsSet.add(Number(u.id));
+            if (u.login) followingUsernamesSet.add(u.login.toLowerCase());
+          });
+        }
+      }
+    } catch { /* ignore network error */ }
+
+    saveToStorage();
+    isInitialized = true;
+    notifyFollowListeners(null, null);
+  })();
+
+  return initPromise;
+}
+
+// Trigger initial authoritative sync in background immediately
 if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === FOLLOWS_CACHE_KEY && e.newValue) {
-      try {
-        const cache = JSON.parse(e.newValue);
-        const current = getAuthenticatedUser();
-        const prefix = `${current.githubUsername.toLowerCase()}->`;
-        Object.keys(cache).forEach((key) => {
-          if (key.startsWith(prefix)) {
-            const target = key.replace(prefix, '');
-            const entry = cache[key];
-            notifyFollowListeners(target, entry?.isFollowing, entry?.followsYou);
-          }
-        });
-      } catch { /* ignore */ }
-    }
-  });
+  initAuthoritativeFollows().catch(() => {});
 }
 
 /**
- * Check directional follow status:
- * isFollowing: Does CURRENT_USER follow TARGET_USER?
- * followsYou: Does TARGET_USER follow CURRENT_USER?
+ * Authoritative check: Does the currently authenticated user follow targetUser?
+ * 
+ * Synchronous, highly optimized lookup:
+ * - Checks targetUser.id against followingIdsSet
+ * - Checks targetUser.login against followingUsernamesSet
  */
-export async function getFollowStatus(targetUsername) {
-  if (!targetUsername) {
+export function isUserFollowed(target) {
+  if (!target) return false;
+  if (isOwnProfile(target)) return false;
+
+  const { targetId, targetUsername } = extractTargetInfo(target);
+
+  if (targetId && followingIdsSet.has(Number(targetId))) {
+    return true;
+  }
+  if (targetUsername && followingUsernamesSet.has(targetUsername)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Get follow status object.
+ */
+export async function getFollowStatus(target) {
+  if (!target) {
     return { isFollowing: false, followsYou: false, isOwnProfile: false };
   }
 
-  const normTarget = targetUsername.toLowerCase().trim();
-
-  // Self-profile check: strictly no following possible
-  if (isOwnProfile(normTarget)) {
-    return {
-      isFollowing: false,
-      followsYou: false,
-      isOwnProfile: true,
-    };
+  if (isOwnProfile(target)) {
+    return { isFollowing: false, followsYou: false, isOwnProfile: true };
   }
 
-  const current = getAuthenticatedUser();
-  const currentNorm = current.githubUsername.toLowerCase().trim();
-  const cacheKey = `${currentNorm}->${normTarget}`;
-
-  // 1. Read cached state
-  const cache = getLocalCache();
-  const cachedEntry = cache[cacheKey];
-  const initialFollowing = Boolean(cachedEntry?.isFollowing);
-  const initialFollowsYou = Boolean(cachedEntry?.followsYou);
-
-  // 2. Fetch from backend API to confirm
-  try {
-    const res = await fetch(
-      `/api/follows?target=${encodeURIComponent(normTarget)}&currentUser=${encodeURIComponent(currentNorm)}`
-    );
-    if (res.ok) {
-      const data = await res.json();
-      cache[cacheKey] = {
-        isFollowing: Boolean(data.isFollowing),
-        followsYou: Boolean(data.followsYou),
-      };
-      saveLocalCache(cache);
-
-      return {
-        isFollowing: Boolean(data.isFollowing),
-        followsYou: Boolean(data.followsYou),
-        isOwnProfile: false,
-      };
-    }
-  } catch (err) {
-    // Graceful fallback to cache
+  // Ensure initialized
+  if (!isInitialized) {
+    await initAuthoritativeFollows();
   }
 
   return {
-    isFollowing: initialFollowing,
-    followsYou: initialFollowsYou,
+    isFollowing: isUserFollowed(target),
+    followsYou: false,
     isOwnProfile: false,
   };
 }
 
 /**
  * Toggle follow status for target user.
- * CURRENT_USER -> TARGET_USER
+ * currentUser → targetUser
  */
-export async function toggleFollow(targetUsername, currentFollowingState = false) {
-  if (!targetUsername) throw new Error('Target username is required');
-
-  const normTarget = targetUsername.toLowerCase().trim();
-
-  // Self-follow rejection
-  if (isOwnProfile(normTarget)) {
+export async function toggleFollow(target, currentFollowingState = null) {
+  if (!target) throw new Error('Target user is required');
+  if (isOwnProfile(target)) {
     throw new Error('Users cannot follow themselves.');
   }
 
-  const current = getAuthenticatedUser();
-  const currentNorm = current.githubUsername.toLowerCase().trim();
-  const cacheKey = `${currentNorm}->${normTarget}`;
-  const nextFollowing = !currentFollowingState;
-  const action = nextFollowing ? 'follow' : 'unfollow';
+  const { targetId, targetUsername } = extractTargetInfo(target);
+  const currentFollowing = currentFollowingState !== null ? currentFollowingState : isUserFollowed(target);
+  const nextFollowing = !currentFollowing;
 
-  const cache = getLocalCache();
-  const previousFollowsYou = cache[cacheKey]?.followsYou || false;
+  // 1. Optimistic Update on authoritative sets
+  if (nextFollowing) {
+    if (targetId) followingIdsSet.add(Number(targetId));
+    if (targetUsername) followingUsernamesSet.add(targetUsername);
+  } else {
+    if (targetId) followingIdsSet.delete(Number(targetId));
+    if (targetUsername) followingUsernamesSet.delete(targetUsername);
+  }
 
-  // 1. Optimistic update
-  cache[cacheKey] = {
-    isFollowing: nextFollowing,
-    followsYou: previousFollowsYou,
-  };
-  saveLocalCache(cache);
-  notifyFollowListeners(normTarget, nextFollowing, previousFollowsYou);
+  saveToStorage();
+  notifyFollowListeners({ targetId, targetUsername }, nextFollowing);
 
-  // 2. Broadcast across tabs
+  // 2. Broadcast across browser tabs
   try {
     if (broadcastChannel) {
       broadcastChannel.postMessage({
-        target: normTarget,
+        targetId,
+        targetUsername,
         isFollowing: nextFollowing,
-        followsYou: previousFollowsYou,
       });
     }
   } catch { /* ignore */ }
 
-  // 3. Broadcast via Supabase Realtime
+  // 3. Broadcast via Supabase Realtime if configured
   try {
     if (isSupabaseConfigured && supabase) {
       const channel = supabase.channel('gitprofile-online-users');
       channel.send({
         type: 'broadcast',
         event: 'follow_change',
-        payload: { target: normTarget, isFollowing: nextFollowing },
+        payload: { targetId, targetUsername, isFollowing: nextFollowing },
       }).catch(() => {});
     }
   } catch { /* ignore */ }
 
   // 4. Persist to API
+  const current = getAuthenticatedUser();
   try {
     const res = await fetch('/api/follows', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        target: normTarget,
-        follower: currentNorm,
-        targetUserId: `usr_${normTarget}`,
+        target: targetUsername,
+        targetUserId: targetId,
+        follower: current.githubUsername,
         followerUserId: current.id,
-        action,
+        action: nextFollowing ? 'follow' : 'unfollow',
       }),
     });
 
     if (res.ok) {
       const data = await res.json();
-      cache[cacheKey] = {
-        isFollowing: Boolean(data.isFollowing),
-        followsYou: Boolean(data.followsYou),
-      };
-      saveLocalCache(cache);
       return {
         success: true,
-        isFollowing: data.isFollowing,
-        followsYou: data.followsYou,
+        isFollowing: Boolean(data.isFollowing),
+        followsYou: Boolean(data.followsYou),
         message: data.message,
       };
     } else {
@@ -282,18 +366,16 @@ export async function toggleFollow(targetUsername, currentFollowingState = false
       throw new Error(err.error || 'Failed to update follow status');
     }
   } catch (err) {
-    if (err.message && err.message.includes('cannot follow themselves')) {
-      delete cache[cacheKey];
-      saveLocalCache(cache);
-      notifyFollowListeners(normTarget, false, previousFollowsYou);
-      throw err;
+    // Revert optimistic update on backend error
+    if (nextFollowing) {
+      if (targetId) followingIdsSet.delete(Number(targetId));
+      if (targetUsername) followingUsernamesSet.delete(targetUsername);
+    } else {
+      if (targetId) followingIdsSet.add(Number(targetId));
+      if (targetUsername) followingUsernamesSet.add(targetUsername);
     }
+    saveToStorage();
+    notifyFollowListeners({ targetId, targetUsername }, currentFollowing);
+    throw err;
   }
-
-  return {
-    success: true,
-    isFollowing: nextFollowing,
-    followsYou: previousFollowsYou,
-    message: nextFollowing ? `Now following @${targetUsername}` : `Unfollowed @${targetUsername}`,
-  };
 }

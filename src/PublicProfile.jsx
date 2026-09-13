@@ -331,7 +331,9 @@ export default function PublicProfile({ username: propUsername }) {
               {!isOwnProfile(profileData.login) && (
                 <div className="shrink-0 flex items-center justify-center sm:justify-end sm:pt-1">
                   <FollowButton
+                    targetUser={profileData}
                     targetUsername={profileData.login}
+                    targetUserId={profileData.id}
                   />
                 </div>
               )}
