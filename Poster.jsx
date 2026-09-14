@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import { 
   Github, 
   Code,
@@ -31,9 +30,7 @@ import {
 } from 'lucide-react';
 import { calculateDeveloperScore } from './src/developerScore.js';
 import DeveloperScore from './src/DeveloperScore.jsx';
-import ShareDialog from './src/ShareDialog.jsx';
 import LiveVisitorCounter from './src/LiveVisitorCounter.jsx';
-import FollowersFollowingModal from './src/FollowersFollowingModal.jsx';
 import FollowButton from './src/FollowButton.jsx';
 import { isOwnProfile } from './src/followService.js';
 import { getPublicProfileUrl } from './src/profileStorage.js';
@@ -45,7 +42,10 @@ import StarredReposSection from './src/sections/StarredReposSection.jsx';
 import ContributionsSection from './src/sections/ContributionsSection.jsx';
 import ActivitySection from './src/sections/ActivitySection.jsx';
 import { OFFICIAL_ACHIEVEMENTS, fetchUserAchievements } from './src/achievementsService.js';
-import AchievementsModal from './src/AchievementsModal.jsx';
+
+const ShareDialog = React.lazy(() => import('./src/ShareDialog.jsx'));
+const FollowersFollowingModal = React.lazy(() => import('./src/FollowersFollowingModal.jsx'));
+const AchievementsModal = React.lazy(() => import('./src/AchievementsModal.jsx'));
 const Card = React.forwardRef(({ children, className = "" }, ref) => (
   <div ref={ref} className={`rounded-xl overflow-hidden ${className}`}>
     {children}
@@ -80,6 +80,87 @@ const Button = ({ children, onClick, variant = "primary", className = "", disabl
 
 const LoadingSpinner = () => (
   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+);
+
+const ProfileCardSkeleton = () => (
+  <div className="w-full flex justify-center" aria-busy="true" aria-live="polite">
+    <div className="w-full max-w-3xl rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm min-h-[720px] transition-all duration-300">
+      {/* Header skeleton */}
+      <div className="p-6 bg-slate-50/80 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+          <div className="w-20 h-20 rounded-full bg-slate-200 animate-pulse shrink-0 border-2 border-white/40 shadow-sm" />
+          <div className="flex-1 text-center sm:text-left min-w-0 space-y-2.5 w-full">
+            <div className="h-7 bg-slate-200 rounded-md w-48 mx-auto sm:mx-0 animate-pulse" />
+            <div className="h-4 bg-slate-200 rounded-md w-28 mx-auto sm:mx-0 animate-pulse" />
+            <div className="h-3.5 bg-slate-100 rounded-md w-64 max-w-full mx-auto sm:mx-0 animate-pulse" />
+            <div className="flex gap-3 justify-center sm:justify-start pt-1">
+              <div className="h-3 bg-slate-100 rounded w-20 animate-pulse" />
+              <div className="h-3 bg-slate-100 rounded w-24 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Body skeleton */}
+      <div className="p-6 space-y-6">
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center animate-pulse">
+              <div className="h-6 bg-slate-200 rounded w-10 mx-auto mb-1" />
+              <div className="h-3 bg-slate-100 rounded w-16 mx-auto" />
+            </div>
+          ))}
+        </div>
+
+        {/* Languages & Radar grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+          <div className="space-y-3">
+            <div className="h-3.5 bg-slate-200 rounded w-28 animate-pulse" />
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-1">
+                  <div className="h-3 bg-slate-100 rounded w-full animate-pulse" />
+                  <div className="h-2 bg-slate-200/70 rounded-full w-full animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center p-4">
+            <div className="w-36 h-36 rounded-full border-2 border-dashed border-slate-200 flex flex-col items-center justify-center animate-pulse gap-2">
+              <LoadingSpinner />
+              <p className="text-xs text-slate-500 font-medium">Fetching Profile...</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Developer Score skeleton */}
+        <div className="space-y-3">
+          <div className="h-3.5 bg-slate-200 rounded w-32 animate-pulse" />
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100 animate-pulse">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-24 h-24 rounded-full bg-slate-200 shrink-0" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 flex-1 w-full">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-10 bg-slate-200/70 rounded" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Repositories skeleton */}
+        <div className="space-y-3">
+          <div className="h-3.5 bg-slate-200 rounded w-32 animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-3 rounded-lg bg-slate-50 border border-slate-100 h-20 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 );
 
 const RadarChart = ({ stats = [], color, theme }) => {
@@ -646,7 +727,7 @@ export default function App() {
       </div>
       ${data.languages && data.languages.length > 0 ? `
       <div class="space-y-3">
-        <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Languages</h3>
+        <h2 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Languages</h2>
         <div class="space-y-2">
           ${data.languages.map(lang => `
             <div class="space-y-1">
@@ -667,7 +748,7 @@ export default function App() {
       ` : ''}
       ${data.top_repos && data.top_repos.length > 0 ? `
       <div class="space-y-3 pt-2">
-        <h3 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Repositories</h3>
+        <h2 class="text-xs font-bold uppercase tracking-wider opacity-70">Top Repositories</h2>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           ${data.top_repos.map(repo => `
             <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
@@ -721,6 +802,7 @@ export default function App() {
     try {
       const el = posterRef.current;
       const login = userData.login || 'github';
+      const html2canvas = (await import('html2canvas')).default;
 
       if (format === 'png') {
         if (!el) throw new Error("Profile card element not found");
@@ -1218,9 +1300,13 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Theme:</span>
+                  <Layers className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                  <label htmlFor="theme-select" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Theme:
+                  </label>
                   <select
+                    id="theme-select"
+                    aria-label="Poster theme"
                     value={theme}
                     onChange={(e) => setTheme(e.target.value)}
                     className="h-10 px-3 pr-8 text-xs font-semibold capitalize bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0a66c2] focus:border-[#0a66c2] cursor-pointer appearance-none transition-all hover:bg-gray-50"
@@ -1243,10 +1329,7 @@ export default function App() {
 
           {/* Active Section Content */}
             {loading ? (
-              <div className="flex flex-col items-center justify-center p-16 gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm">
-                <LoadingSpinner />
-                <p className="text-gray-500 text-sm">Fetching GitHub Profile...</p>
-              </div>
+              <ProfileCardSkeleton />
             ) : error ? (
               <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 text-center max-w-md mx-auto">
                 <p className="font-semibold">Failed to load profile</p>
@@ -1263,9 +1346,18 @@ export default function App() {
               <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 flex-1 min-w-0">
                   <img
-                    src={userData.avatar_url}
+                    src={
+                      userData.avatar_url
+                        ? (userData.avatar_url.includes('?')
+                            ? `${userData.avatar_url}&s=160`
+                            : `${userData.avatar_url}?s=160`)
+                        : ''
+                    }
                     alt={userData.name || userData.login}
-                    className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md shrink-0"
+                    width={80}
+                    height={80}
+                    decoding="async"
+                    className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md shrink-0 object-cover"
                   />
                   <div className="flex-1 text-center sm:text-left min-w-0">
                     <h1 className="text-2xl font-bold tracking-tight">
@@ -1359,9 +1451,9 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                 {/* Top Languages */}
                 <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                     <Code className="w-3.5 h-3.5" /> Top Languages
-                  </h3>
+                  </h2>
                   <div className="space-y-2">
                     {userData.languages.map((lang) => (
                       <div key={lang.name} className="space-y-1">
@@ -1388,9 +1480,9 @@ export default function App() {
 
                 {/* Radar Chart */}
                 <div className="flex flex-col items-center">
-                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 mb-2 flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 mb-2 flex items-center gap-1.5">
                     <TrendingUp className="w-3.5 h-3.5" /> Developer Skill Matrix
-                  </h3>
+                  </h2>
                   <RadarChart stats={userData.chartStats} color={currentTheme.accent} theme={theme} />
                 </div>
               </div>
@@ -1407,9 +1499,9 @@ export default function App() {
               {/* Top Repositories */}
               {userData.top_repos && userData.top_repos.length > 0 && (
                 <div className="space-y-3 pt-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                     <Award className="w-3.5 h-3.5" /> Top Repositories
-                  </h3>
+                  </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {userData.top_repos.map((repo) => (
                       <div key={repo.name} className={`p-3 rounded-lg ${currentTheme.cardInner} flex flex-col justify-between`}>
@@ -1641,7 +1733,7 @@ export default function App() {
             ) : null}
 
             {/* Footer & Live Stats */}
-            <footer className="w-full max-w-3xl mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <footer className="w-full max-w-3xl mt-10 pt-6 pb-8 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
               <div className="flex items-center gap-3">
                 <LiveVisitorCounter />
               </div>
@@ -1655,8 +1747,8 @@ export default function App() {
                   <Github className="w-3.5 h-3.5" />
                   <span>GitHub</span>
                 </a>
-                <span className="text-slate-300">•</span>
-                <span>MIT License</span>
+                <span className="text-slate-400">•</span>
+                <span className="text-slate-600">MIT License</span>
               </div>
             </footer>
           </main>
@@ -1664,37 +1756,43 @@ export default function App() {
 
       {/* Share Modal */}
       {userData && (
-        <ShareDialog
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
-          username={userData.name || userData.login}
-          profileUrl={shareUrl || getPublicProfileUrl(userData.login)}
-        />
+        <React.Suspense fallback={null}>
+          <ShareDialog
+            isOpen={showShareModal}
+            onClose={() => setShowShareModal(false)}
+            username={userData.name || userData.login}
+            profileUrl={shareUrl || getPublicProfileUrl(userData.login)}
+          />
+        </React.Suspense>
       )}
 
       {/* Achievements Modal */}
       {userData && (
-        <AchievementsModal
-          isOpen={showAchievementsModal}
-          onClose={() => setShowAchievementsModal(false)}
-          userData={userData}
-          achievements={achievements}
-          loading={achievementsLoading}
-          error={achievementsError}
-          onRefresh={() => loadAchievements(userData.login)}
-        />
+        <React.Suspense fallback={null}>
+          <AchievementsModal
+            isOpen={showAchievementsModal}
+            onClose={() => setShowAchievementsModal(false)}
+            userData={userData}
+            achievements={achievements}
+            loading={achievementsLoading}
+            error={achievementsError}
+            onRefresh={() => loadAchievements(userData.login)}
+          />
+        </React.Suspense>
       )}
 
       {/* Followers / Following Modal */}
       {userData && (
-        <FollowersFollowingModal
-          isOpen={followModalOpen}
-          onClose={() => setFollowModalOpen(false)}
-          username={userData.login}
-          followersCount={isOwnProfile(userData.login) ? (userData.followers || 0) : (userData.followers || 0) + (isFollowingProfile ? 1 : 0)}
-          followingCount={userData.following || 0}
-          initialTab={followModalTab}
-        />
+        <React.Suspense fallback={null}>
+          <FollowersFollowingModal
+            isOpen={followModalOpen}
+            onClose={() => setFollowModalOpen(false)}
+            username={userData.login}
+            followersCount={isOwnProfile(userData.login) ? (userData.followers || 0) : (userData.followers || 0) + (isFollowingProfile ? 1 : 0)}
+            followingCount={userData.following || 0}
+            initialTab={followModalTab}
+          />
+        </React.Suspense>
       )}
 
       {/* Export Preview Modal */}

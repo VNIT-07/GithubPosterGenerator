@@ -280,9 +280,18 @@ export default function PublicProfile({ username: propUsername }) {
             <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 flex-1 min-w-0">
                 <img
-                  src={profileData.avatar_url}
+                  src={
+                    profileData.avatar_url
+                      ? (profileData.avatar_url.includes('?')
+                          ? `${profileData.avatar_url}&s=160`
+                          : `${profileData.avatar_url}?s=160`)
+                      : ''
+                  }
                   alt={profileData.name || profileData.login}
-                  className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md shrink-0"
+                  width={80}
+                  height={80}
+                  decoding="async"
+                  className="w-20 h-20 rounded-full border-2 border-white/20 shadow-md shrink-0 object-cover"
                   onError={(e) => {
                     e.target.src = `https://unavatar.io/github/${profileData.login}`;
                   }}
@@ -362,9 +371,9 @@ export default function PublicProfile({ username: propUsername }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               {/* Top Languages */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                   <Code className="w-3.5 h-3.5" /> Top Languages
-                </h3>
+                </h2>
                 <div className="space-y-2">
                   {languageData && languageData.length > 0 ? (
                     languageData.map((lang) => (
@@ -396,9 +405,9 @@ export default function PublicProfile({ username: propUsername }) {
               {/* Radar Chart */}
               {analyticsData.chartStats && (
                 <div className="flex flex-col items-center">
-                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 mb-2 flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 mb-2 flex items-center gap-1.5">
                     <TrendingUp className="w-3.5 h-3.5" /> Developer Skill Matrix
-                  </h3>
+                  </h2>
                   <RadarChart stats={analyticsData.chartStats} color={currentTheme.accent} theme={theme} />
                 </div>
               )}
@@ -416,9 +425,9 @@ export default function PublicProfile({ username: propUsername }) {
             {/* Top Repositories */}
             {repositoryData && repositoryData.length > 0 && (
               <div className="space-y-3 pt-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+                <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
                   <Award className="w-3.5 h-3.5" /> Top Repositories
-                </h3>
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {repositoryData.map((repo) => (
                     <a

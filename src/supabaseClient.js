@@ -12,8 +12,10 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = Boolean(
   typeof supabaseUrl === 'string' &&
   supabaseUrl.trim().length > 0 &&
+  !supabaseUrl.includes('your-project-id') &&
   typeof supabaseAnonKey === 'string' &&
-  supabaseAnonKey.trim().length > 0
+  supabaseAnonKey.trim().length > 0 &&
+  !supabaseAnonKey.includes('your_supabase_anon_key')
 );
 
 export const supabase = isSupabaseConfigured

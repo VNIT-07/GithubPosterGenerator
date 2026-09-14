@@ -240,9 +240,9 @@ export default function DeveloperScore({ scoreData, theme, currentTheme }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
+      <h2 className="text-xs font-bold uppercase tracking-wider opacity-70 flex items-center gap-1.5">
         <Award className="w-3.5 h-3.5" /> Developer Score
-      </h3>
+      </h2>
 
       <div className={`p-4 rounded-lg ${currentTheme.cardInner}`}>
         <div className="flex flex-col sm:flex-row items-center gap-4">

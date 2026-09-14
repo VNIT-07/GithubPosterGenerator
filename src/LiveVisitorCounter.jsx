@@ -145,12 +145,12 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
         {isConnected ? (
           <span className="flex items-center gap-1">
             <strong className="font-bold tabular-nums text-slate-900">{formattedCount}</strong>
-            <span className="text-slate-500 font-normal">online</span>
+            <span className="text-slate-600 font-normal">online</span>
           </span>
         ) : isConnecting ? (
           <span className="opacity-60 text-[11px] font-mono animate-pulse">Connecting…</span>
         ) : (
-          <span className="text-slate-500 text-[11px] font-normal">Offline</span>
+          <span className="text-slate-600 text-[11px] font-normal">Offline</span>
         )}
 
         <RefreshCw
@@ -201,7 +201,7 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
             <strong className="font-bold text-slate-900 tabular-nums">
               {formattedCount}
             </strong>{' '}
-            <span className="text-slate-500">
+            <span className="text-slate-600">
               {formattedCount === 1 ? 'developer' : 'developers'} online
             </span>
           </span>
@@ -210,7 +210,7 @@ export default function LiveVisitorCounter({ variant = 'badge', className = '' }
             Connecting…
           </span>
         ) : (
-          <span className="text-slate-500 text-[11px]">
+          <span className="text-slate-600 text-[11px]">
             Presence offline
           </span>
         )}
